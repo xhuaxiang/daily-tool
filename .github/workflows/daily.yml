@@ -1,0 +1,29 @@
+name: Daily News Brief
+
+on:
+  schedule:
+    # 每天 UTC 0:00 = 北京时间 8:00
+    - cron: '0 0 * * *'
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  news:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4 lxml
+
+      - name: Run news brief
+        env:
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python main.py
+
