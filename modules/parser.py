@@ -32,7 +32,7 @@ def _parse_rss(content: str, source_name: str, max_articles: int) -> list[dict]:
         if not title:
             continue
         plain_text = (
-            BeautifulSoup(description, "html.parser").get_text(separator=" ")
+            BeautifulSoup(description, "lxml").get_text(separator=" ", strip=True)
             if description
             else ""
         )
@@ -57,7 +57,7 @@ def _parse_rss(content: str, source_name: str, max_articles: int) -> list[dict]:
         link = link_el.get("href", "") if link_el is not None else ""
         summary_text = ""
         if summary_el is not None and summary_el.text:
-            summary_text = BeautifulSoup(summary_el.text, "html.parser").get_text(separator=" ")
+            summary_text = BeautifulSoup(summary_el.text, "lxml").get_text(separator=" ")
         pub_date = updated_el.text.strip() if updated_el is not None and updated_el.text else ""
         if not title:
             continue
