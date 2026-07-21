@@ -12,26 +12,19 @@ DEFAULT_CONFIG = {
     "news_sources": [
         {"name": "36氪", "type": "rss", "url": "https://36kr.com/feed"},
         {"name": "Hacker News", "type": "rss", "url": "https://hnrss.org/frontpage"},
-        {"name": "华尔街见闻", "type": "rss", "url": "https://wallstreetcn.com/rss"},
-        {"name": "观察者网", "type": "rss", "url": "https://www.guancha.cn/rss.xml"},
-        {"name": "Reuters", "type": "rss", "url": "https://www.reutersagency.com/feed/"},
-        {"name": "BBC", "type": "rss", "url": "https://feeds.bbci.co.uk/news/rss.xml"},
-        {"name": "NYT", "type": "rss", "url": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"},
-        {"name": "Ars Technica", "type": "rss", "url": "https://feeds.arstechnica.com/arstechnica/index"},
-        {"name": "Reuters World News", "type": "rss", "url": "https://www.reuters.com/world/rss"},
-        {"name": "BBC Top Stories", "type": "rss", "url": "https://feeds.bbci.co.uk/news/rss.xml"},
-        {"name": "Bloomberg Markets", "type": "rss", "url": "https://www.bloomberg.com/feeds/markets.rss"},
-        {"name": "The Guardian World News", "type": "rss", "url": "https://www.theguardian.com/world/rss"},
+        {"name": "MIT Tech Review", "type": "rss", "url": "https://www.technologyreview.com/feed"},
+        {"name": "凤凰网资讯", "type": "rss", "url": "https://news.ifeng.com/rss/"},
+        {"name": "财新网", "type": "rss", "url": "https://www.caixin.com/rss/"},
         {"name": "CNBC Top News", "type": "rss", "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html"},
-        {"name": "MIT Technology Review", "type": "rss", "url": "https://www.technologyreview.com/feed"},
-        {"name": "Hacker News", "type": "rss", "url": "https://hnrss.org/frontpage"},
-        {"name": "联合早报即时新闻", "type": "rss", "url": "https://www.zaobao.com/news/instant-news/rss.xml"}
+        {"name": "NPR News", "type": "rss", "url": "https://feeds.npr.org/1001/rss.xml"},
+        {"name": "Ars Technica", "type": "rss", "url": "https://feeds.arstechnica.com/arstechnica/index"},
+        {"name": "TechCrunch", "type": "rss", "url": "https://techcrunch.com/feed/"},
     ],
     "email": {
         "smtp_server": "smtp.qq.com",
         "smtp_port": 587,
-        "sender_email": "shion_1130@qq.com",
-        "receiver_email": "shion_1130@qq.com"
+        "sender_email": "",
+        "receiver_email": ""
     },
     "ai": [
         {
@@ -40,7 +33,7 @@ DEFAULT_CONFIG = {
         }
     ],
     "prefer_categories": ["时事", "经济", "时政", "财经", "国际", "政治", "政策"],
-    "max_articles": 40,
+    "max_articles": 30,
     "summary_language": "zh",
 }
 
@@ -66,5 +59,4 @@ def load_config() -> dict:
     cfg["ai"] = ai_list
 
     return cfg
-
 

@@ -58,6 +58,40 @@ def send_email(email_cfg: dict, articles: list[dict]) -> bool:
     smtp_server = email_cfg.get("smtp_server", "smtp.qq.com")
     smtp_port = email_cfg.get("smtp_port", 587)
     sender = email_cfg.get("sender_email", "")
+    receiver_raw = email_cfg.get("receiver_email", "")
+    password = os.environ.get("EMAIL_PASSWORD", "")
+
+    if not sender or not receiver_raw or not password:
+        logger.warning("Email config incomplete, skipping send")
+        return False
+
+    # 支持多个收件人，用逗号分隔
+    receivers = [r.strip() for r in receiver_raw.replace("，", ",").split(",") if r.strip()]
+
+    if not receivers:
+        logger.warning("No valid receiver email, skipping send")
+        return False
+
+    html = build_html(articles)
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"每日新闻早报 ({len(articles)} 条)"
+    msg["From"] = sender
+    msg["To"] = ", ".join(receivers)
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(sender, password)
+            server.sendmail(sender, receivers, msg.as_string())
+        logger.info("Email sent to %d recipients: %s", len(receivers), ", ".join(receivers))
+        return True
+    except Exception as e:
+        logger.exception("Failed to send email: %s", e)
+        return False
+    smtp_server = email_cfg.get("smtp_server", "smtp.qq.com")
+    smtp_port = email_cfg.get("smtp_port", 587)
+    sender = email_cfg.get("sender_email", "")
     receiver = email_cfg.get("receiver_email", "")
     password = os.environ.get("EMAIL_PASSWORD", "")
 
