@@ -17,8 +17,10 @@ DEFAULT_CONFIG = {
         {"name": "财新网", "type": "rss", "url": "https://www.caixin.com/rss/"},
         {"name": "CNBC Top News", "type": "rss", "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html"},
         {"name": "NPR News", "type": "rss", "url": "https://feeds.npr.org/1001/rss.xml"},
-        {"name": "Ars Technica", "type": "rss", "url": "https://feeds.arstechnica.com/arstechnica/index"},
-        {"name": "TechCrunch", "type": "rss", "url": "https://techcrunch.com/feed/"},
+        # {"name": "Ars Technica", "type": "rss", "url": "https://feeds.arstechnica.com/arstechnica/index"},
+        {"name": "Reuters", "type": "rss", "url": "http://feeds.feedburner.com/Reuters/news"},
+        # {"name": "bbc", "type": "rss", "url": "https://feeds.bbci.co.uk/news/rss.xml"},
+        # {"name": "TechCrunch", "type": "rss", "url": "https://techcrunch.com/feed/"},
     ],
     "email": {
         "smtp_server": "smtp.qq.com",

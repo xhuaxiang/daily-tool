@@ -49,8 +49,8 @@ def main():
         raw = fetch(src.get("url"), src.get("name", "unknown"), src.get("timeout", 15))
         if not raw:
             continue
-        # 每个源抓取稍多一些，供随机挑选
-        articles = parse(src, raw, 10)
+        # 每个源多抓一些，方便按时间筛选最新的
+        articles = parse(src, raw, 30)
         all_articles.extend(articles)
 
     if not all_articles:
@@ -68,36 +68,26 @@ def main():
 
     logger.info("Total unique articles: %d", len(unique))
 
-    # 按源分组，每个源随机挑几篇，保证覆盖面
-    random.seed()
+    # 按源分组，每个源只取最新的 N 篇
     source_groups = {}
     for art in unique:
         src = art.get("source", "unknown")
         source_groups.setdefault(src, []).append(art)
 
-    selected = []
-    # 每源至少贡献的文章数
-    base_per_source = max(1, max_articles // len(source_groups))
-    remaining = max_articles
-
-    # 先每个源按时间取最新的 base_per_source 篇
+    # 每源最多保留最新文章数
+    fresh_per_source = 5  
+    fresh_articles = []
     for src, arts in source_groups.items():
-        # 有日期的按日期降序排，没日期的放后面
         arts_sorted = sorted(arts, key=lambda a: _parse_date(a.get("pub_date", "")), reverse=True)
-        take = min(base_per_source, len(arts_sorted))
-        selected.extend(arts_sorted[:take])
-        remaining -= take
+        fresh_articles.extend(arts_sorted[:fresh_per_source])
 
-    # 还有剩余名额，从所有剩余文章中随机挑选
-    if remaining > 0:
-        pool = [a for a in unique if a not in selected]
-        random.shuffle(pool)
-        selected.extend(pool[:remaining])
+    logger.info("Fresh articles (latest %d per source): %d", fresh_per_source, len(fresh_articles))
 
-    # 打乱最终顺序，混合各源内容
-    random.shuffle(selected)
+    # 从最新文章中随机挑选最终数量，再打乱
+    random.shuffle(fresh_articles)
+    all_articles = fresh_articles[:max_articles]
+    random.shuffle(all_articles)
 
-    all_articles = selected[:max_articles]
     logger.info("Final articles: %d from %d sources", len(all_articles), len(source_groups))
 
     # 摘要
