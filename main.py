@@ -5,7 +5,6 @@
 """
 
 import logging
-import random
 
 from modules.config import load_config
 from modules.fetcher import fetch
@@ -83,10 +82,8 @@ def main():
 
     logger.info("Fresh articles (latest %d per source): %d", fresh_per_source, len(fresh_articles))
 
-    # 从最新文章中随机挑选最终数量，再打乱
-    random.shuffle(fresh_articles)
-    all_articles = fresh_articles[:max_articles]
-    random.shuffle(all_articles)
+    # 取最新文章，按发布时间倒序排列
+    all_articles = sorted(fresh_articles, key=lambda a: _parse_date(a.get("pub_date", "")), reverse=True)[:max_articles]
 
     logger.info("Final articles: %d from %d sources", len(all_articles), len(source_groups))
 

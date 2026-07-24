@@ -21,6 +21,7 @@ DEFAULT_CONFIG = {
         {"name": "Reuters", "type": "rss", "url": "http://feeds.feedburner.com/Reuters/news"},
         # {"name": "bbc", "type": "rss", "url": "https://feeds.bbci.co.uk/news/rss.xml"},
         # {"name": "TechCrunch", "type": "rss", "url": "https://techcrunch.com/feed/"},
+        {"name": "France 24", "type": "rss", "url": "https://www.france24.com/en/rss"},
     ],
     "email": {
         "smtp_server": "smtp.qq.com",
