@@ -31,8 +31,8 @@ DEFAULT_CONFIG = {
     },
     "ai": [
         {
-            "provider": "gemini",
-            "model": "gemini-2.0-flash-lite"
+            "provider": "deepseek",
+            "model": "deepseek-chat"
         }
     ],
     "prefer_categories": ["时事", "经济", "时政", "财经", "国际", "政治", "政策"],
