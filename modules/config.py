@@ -32,7 +32,7 @@ DEFAULT_CONFIG = {
     "ai": [
         {
             "provider": "deepseek",
-            "model": "deepseek-chat"
+            "model": "deepseek-v4-flash"
         }
     ],
     "prefer_categories": ["时事", "经济", "时政", "财经", "国际", "政治", "政策"],
