@@ -35,7 +35,7 @@ DEFAULT_CONFIG = {
             "model": "deepseek-v4-flash"
         }
     ],
-    "prefer_categories": ["时事", "经济", "时政", "财经", "国际", "政治", "政策"],
+    "prefer_categories": ["经济", "财经", "科技", "时政", "国际", "时事"],
     "max_articles": 30,
     "summary_language": "zh",
 }

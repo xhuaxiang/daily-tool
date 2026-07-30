@@ -11,7 +11,7 @@ from modules.fetcher import fetch
 from modules.parser import parse
 from modules.summarizer import summarize_all
 from modules.mailer import send_email
-from modules.categorizer import classify
+from modules.categorizer import classify, sort_by_preference
 
 logging.basicConfig(
     level=logging.INFO,
@@ -89,6 +89,9 @@ def main():
 
     # 摘要
     all_articles = summarize_all(all_articles, language, ai_cfg)
+
+    # 按用户偏好排序
+    all_articles = sort_by_preference(all_articles, prefer_categories)
 
     # 控制台输出
     print()
