@@ -19,9 +19,6 @@ jobs:
       - name: Install dependencies
         run: pip install requests beautifulsoup4 lxml
 
-      - name: Aggregate global RSS feeds
-        run: python feed/aggregator.py
-
       - name: Run news brief (fetch + summarize + email)
         env:
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
