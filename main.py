@@ -41,6 +41,21 @@ def _parse_datetime(pub_date: str) -> datetime | None:
     return None
 
 
+# 东八区
+_BEIJING_TZ = timezone(timedelta(hours=8))
+
+
+def _to_beijing_time(pub_date: str) -> str:
+    """将 pubDate 转为东八区 YYYY-MM-DD hh:mm:ss，解析失败返回原字符串"""
+    dt = _parse_datetime(pub_date)
+    if dt is None:
+        return pub_date or ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    local = dt.astimezone(_BEIJING_TZ)
+    return local.strftime("%Y-%m-%d %H:%M:%S")
+
+
 def _is_today(pub_date: str, max_age_hours: int = 24) -> bool:
     """判断 pub_date 是否在最近 max_age_hours 小时内"""
     dt = _parse_datetime(pub_date)
@@ -128,6 +143,10 @@ def main():
     # 按用户偏好排序
     all_articles = sort_by_preference(all_articles, prefer_categories)
 
+    # 统一 pub_date 为东八区 YYYY-MM-DD hh:mm:ss
+    for art in all_articles:
+        art["pub_date"] = _to_beijing_time(art.get("pub_date", ""))
+
     # 控制台输出
     print()
     print("=" * 50)
@@ -137,7 +156,8 @@ def main():
         cat, _ = classify(art)
         tag = f"[{cat}]" if cat != "其他" else ""
         title = art.get('title', '').replace('\xa0', ' ').strip()
-        print(f"\n#{i} {tag} [{art.get('source','')}] {title}")
+        date_str = art.get('pub_date', '')
+        print(f"\n#{i} {tag} [{art.get('source','')}] {date_str} {title}")
         if art.get("summary"):
             summary = art['summary'].replace('\xa0', ' ').strip()
             print(f"   >> {summary}")

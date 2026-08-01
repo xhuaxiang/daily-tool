@@ -3,13 +3,17 @@
 import logging
 import os
 import smtplib
+from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 logger = logging.getLogger("news")
 
+_BEIJING_TZ = timezone(timedelta(hours=8))
+
 
 def build_html(articles: list[dict]) -> str:
+    now_str = datetime.now(_BEIJING_TZ).strftime("%Y-%m-%d %H:%M")
     items_html = ""
     for i, art in enumerate(articles, 1):
         title = art.get("title", "")
@@ -44,7 +48,7 @@ def build_html(articles: list[dict]) -> str:
 <body style="font-family:'Segoe UI','Microsoft YaHei',sans-serif;max-width:640px;margin:0 auto;padding:20px;">
     <div style="text-align:center;padding:20px 0;border-bottom:2px solid #e0e0e0;margin-bottom:20px;">
         <h1 style="margin:0;font-size:24px;color:#333;">每日新闻早报</h1>
-        <p style="margin:6px 0 0;color:#999;font-size:13px;">共 {len(articles)} 条新闻</p>
+        <p style="margin:6px 0 0;color:#999;font-size:13px;">{now_str} (UTC+8) &nbsp;·&nbsp; 共 {len(articles)} 条新闻</p>
     </div>
     {items_html}
     <div style="text-align:center;padding:16px 0;border-top:1px solid #e0e0e0;margin-top:20px;color:#aaa;font-size:12px;">
@@ -72,9 +76,10 @@ def send_email(email_cfg: dict, articles: list[dict]) -> bool:
         logger.warning("No valid receiver email, skipping send")
         return False
 
+    now_str = datetime.now(_BEIJING_TZ).strftime("%Y-%m-%d")
     html = build_html(articles)
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"每日新闻早报 ({len(articles)} 条)"
+    msg["Subject"] = f"每日新闻早报 {now_str} ({len(articles)} 条)"
     msg["From"] = sender
     msg["To"] = ", ".join(receivers)
     msg.attach(MIMEText(html, "html", "utf-8"))
