@@ -10,18 +10,14 @@ CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 
 DEFAULT_CONFIG = {
     "news_sources": [
-        {"name": "36氪", "type": "rss", "url": "https://36kr.com/feed"},
-        {"name": "Hacker News", "type": "rss", "url": "https://hnrss.org/frontpage"},
-        {"name": "MIT Tech Review", "type": "rss", "url": "https://www.technologyreview.com/feed"},
-        {"name": "凤凰网资讯", "type": "rss", "url": "https://news.ifeng.com/rss/"},
-        {"name": "财新网", "type": "rss", "url": "https://www.caixin.com/rss/"},
         {"name": "CNBC Top News", "type": "rss", "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html"},
-        {"name": "NPR News", "type": "rss", "url": "https://feeds.npr.org/1001/rss.xml"},
-        # {"name": "Ars Technica", "type": "rss", "url": "https://feeds.arstechnica.com/arstechnica/index"},
-        {"name": "Reuters", "type": "rss", "url": "http://feeds.feedburner.com/Reuters/news"},
-        # {"name": "bbc", "type": "rss", "url": "https://feeds.bbci.co.uk/news/rss.xml"},
-        # {"name": "TechCrunch", "type": "rss", "url": "https://techcrunch.com/feed/"},
-        {"name": "France 24", "type": "rss", "url": "https://www.france24.com/en/rss"},
+        {"name": "CNBC Markets", "type": "rss", "url": "https://www.cnbc.com/id/10001147/device/rss/rss.html"},
+        {"name": "CNBC Economy", "type": "rss", "url": "https://www.cnbc.com/id/20910258/device/rss/rss.html"},
+        {"name": "WSJ Markets", "type": "rss", "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"},
+        {"name": "MarketWatch Top", "type": "rss", "url": "https://feeds.marketwatch.com/marketwatch/topstories/"},
+        {"name": "France 24 Economy", "type": "rss", "url": "https://www.france24.com/en/economy/rss"},
+        {"name": "36氪", "type": "rss", "url": "https://36kr.com/feed"},
+        {"name": "全球财经聚合", "type": "file", "url": "feed/aggregated.xml"},
     ],
     "email": {
         "smtp_server": "smtp.qq.com",
@@ -36,7 +32,7 @@ DEFAULT_CONFIG = {
         }
     ],
     "prefer_categories": ["经济", "财经", "科技", "时政", "国际", "时事"],
-    "max_articles": 30,
+    "max_articles": 15,
     "summary_language": "zh",
 }
 

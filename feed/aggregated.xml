@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Global Financial News Aggregator</title>
+    <description>Aggregated financial news from Bloomberg, FT, Reuters, BBC, NYT, Economist, Nikkei Asia, SCMP. Updated by GitHub Actions every 4 hours.</description>
+    <link>https://github.com/xhx/daily-tool</link>
+    <lastBuildDate>Pending first aggregation run</lastBuildDate>
+  </channel>
+</rss>

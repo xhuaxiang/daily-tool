@@ -4,7 +4,9 @@
 入口文件，直接 python main.py 运行
 """
 
+import email.utils
 import logging
+from datetime import datetime, timedelta, timezone
 
 from modules.config import load_config
 from modules.fetcher import fetch
@@ -21,18 +23,41 @@ logging.basicConfig(
 logger = logging.getLogger("news")
 
 
-def _parse_date(pub_date: str) -> str:
-    """提取日期用于排序，无日期则返空"""
+def _parse_datetime(pub_date: str) -> datetime | None:
+    """将 pubDate 字符串解析为 UTC datetime，解析失败返回 None"""
     if not pub_date:
-        return ""
-    # 取前10~25字符作为粗略时间
-    return pub_date[:25]
+        return None
+    # RFC 2822 (RSS 标准)
+    try:
+        return email.utils.parsedate_to_datetime(pub_date)
+    except (ValueError, TypeError):
+        pass
+    # ISO 8601 / Atom
+    try:
+        s = pub_date.replace("Z", "+00:00")
+        return datetime.fromisoformat(s)
+    except (ValueError, TypeError):
+        pass
+    return None
+
+
+def _is_today(pub_date: str, max_age_hours: int = 24) -> bool:
+    """判断 pub_date 是否在最近 max_age_hours 小时内"""
+    dt = _parse_datetime(pub_date)
+    if dt is None:
+        return True  # 无日期的文章保留，避免误杀
+    # 统一转为 UTC
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
+    age = now - dt
+    return age <= timedelta(hours=max_age_hours)
 
 
 def main():
     config = load_config()
     sources = config.get("news_sources", [])
-    max_articles = config.get("max_articles", 30)
+    max_articles = config.get("max_articles", 15)
     language = config.get("summary_language", "zh")
     email_cfg = config.get("email", {})
     ai_cfg = config.get("ai", {})
@@ -45,7 +70,7 @@ def main():
     all_articles = []
 
     for src in sources:
-        raw = fetch(src.get("url"), src.get("name", "unknown"), src.get("timeout", 15))
+        raw = fetch(src.get("url"), src.get("name", "unknown"), src.get("timeout", 15), src.get("type", "rss"))
         if not raw:
             continue
         # 每个源多抓一些，方便按时间筛选最新的
@@ -67,23 +92,33 @@ def main():
 
     logger.info("Total unique articles: %d", len(unique))
 
+    # 只保留今天（24h内）的文章
+    today_articles = [a for a in unique if _is_today(a.get("pub_date", ""))]
+    dropped = len(unique) - len(today_articles)
+    if dropped:
+        logger.info("Dropped %d old articles (older than 24h), kept %d", dropped, len(today_articles))
+
+    if not today_articles:
+        logger.warning("No articles from today, falling back to all unique articles")
+        today_articles = unique
+
     # 按源分组，每个源只取最新的 N 篇
     source_groups = {}
-    for art in unique:
+    for art in today_articles:
         src = art.get("source", "unknown")
         source_groups.setdefault(src, []).append(art)
 
     # 每源最多保留最新文章数
-    fresh_per_source = 5  
+    fresh_per_source = 5
     fresh_articles = []
     for src, arts in source_groups.items():
-        arts_sorted = sorted(arts, key=lambda a: _parse_date(a.get("pub_date", "")), reverse=True)
+        arts_sorted = sorted(arts, key=lambda a: _parse_datetime(a.get("pub_date", "")) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
         fresh_articles.extend(arts_sorted[:fresh_per_source])
 
     logger.info("Fresh articles (latest %d per source): %d", fresh_per_source, len(fresh_articles))
 
     # 取最新文章，按发布时间倒序排列
-    all_articles = sorted(fresh_articles, key=lambda a: _parse_date(a.get("pub_date", "")), reverse=True)[:max_articles]
+    all_articles = sorted(fresh_articles, key=lambda a: _parse_datetime(a.get("pub_date", "")) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)[:max_articles]
 
     logger.info("Final articles: %d from %d sources", len(all_articles), len(source_groups))
 
