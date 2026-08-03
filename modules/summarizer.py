@@ -40,8 +40,8 @@ def _get_api_key(item: dict) -> str:
 def _build_prompt(text: str, language: str) -> str:
     lang_label = "中文" if language == "zh" else "英文"
     return (
-        f"请用{lang_label}为以下新闻写一句话摘要（不超过50字），"
-        f"要求准确概括核心信息，保留关键数据：\n\n{text[:2000]}"
+        f"请用{lang_label}为以下新闻写一段摘要（100-200字），"
+        f"涵盖核心事实、关键数据、各方观点或背景，让读者无需点击原文也能了解全貌：\n\n{text[:3000]}"
     )
 
 
@@ -49,7 +49,7 @@ def _call_gemini(api_key: str, model: str, prompt: str) -> str | None:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 100},
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 400},
     }
     try:
         resp = requests.post(url, params={"key": api_key}, json=payload, timeout=30)
@@ -73,7 +73,7 @@ def _call_openai_compat(api_key: str, model: str, prompt: str, base_url: str) ->
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3,
-        "max_tokens": 100,
+        "max_tokens": 400,
     }
     try:
         resp = requests.post(url, headers=headers, json=payload, timeout=30)
