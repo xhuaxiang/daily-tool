@@ -158,6 +158,9 @@ def main():
         title = art.get('title', '').replace('\xa0', ' ').strip()
         date_str = art.get('pub_date', '')
         print(f"\n#{i} {tag} [{art.get('source','')}] {date_str} {title}")
+        if art.get("excerpt"):
+            excerpt = art['excerpt'].replace('\xa0', ' ').strip()
+            print(f"   EN: {excerpt}")
         if art.get("summary"):
             summary = art['summary'].replace('\xa0', ' ').strip()
             print(f"   >> {summary}")

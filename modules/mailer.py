@@ -33,6 +33,9 @@ def build_html(articles: list[dict]) -> str:
             <div style="font-size:16px;font-weight:bold;margin-bottom:6px;">
                 {title}
             </div>
+            <div style="font-size:12px;color:#888;margin-bottom:6px;line-height:1.5;">
+                {art.get("excerpt", "")}
+            </div>
             <div style="font-size:14px;color:#444;margin-bottom:6px;line-height:1.6;">
                 {summary}
             </div>

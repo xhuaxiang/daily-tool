@@ -40,7 +40,7 @@ def _parse_rss(content: str, source_name: str, max_articles: int) -> list[dict]:
         articles.append({
             "title": unescape(title),
             "link": link,
-            "snippet": plain_text[:500],
+            "snippet": plain_text[:2000],
             "pub_date": pub_date,
             "source": source_name,
         })
@@ -64,7 +64,7 @@ def _parse_rss(content: str, source_name: str, max_articles: int) -> list[dict]:
         articles.append({
             "title": unescape(title),
             "link": link,
-            "snippet": summary_text[:500] if summary_text else "",
+            "snippet": summary_text[:2000] if summary_text else "",
             "pub_date": pub_date,
             "source": source_name,
         })
