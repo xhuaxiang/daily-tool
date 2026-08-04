@@ -57,18 +57,6 @@ def _call_ai(api_key: str, model: str, prompt: str, base_url: str) -> str | None
     return None
 
 
-def _local_summary(article: dict) -> str:
-    """本地摘要：取正文第一句"""
-    snippet = article.get("snippet", "")
-    if not snippet:
-        return ""
-    sentences = re.split(r"[。！？\n]", snippet)
-    first = sentences[0].strip() if sentences else ""
-    if len(first) > 150:
-        first = first[:147] + "..."
-    return first
-
-
 def _english_excerpt(snippet: str) -> str:
     """提取英文原文前 1-2 句，100-150 字符，仅处理英文为主的文本"""
     if not snippet:
@@ -89,7 +77,7 @@ def _english_excerpt(snippet: str) -> str:
 
 
 def summarize_all(articles: list[dict], language: str = "zh", ai_cfg: list | dict | None = None) -> list[dict]:
-    """批量生成摘要：AI 优先，失败则本地 fallback"""
+    """批量生成摘要：AI 优先，失败则摘要留空（不展示 fallback）"""
     if isinstance(ai_cfg, dict):
         ai_cfg = [ai_cfg]
     ai_cfg = ai_cfg or []
@@ -121,7 +109,7 @@ def summarize_all(articles: list[dict], language: str = "zh", ai_cfg: list | dic
             if summary:
                 break
 
-        art["summary"] = summary or _local_summary(art)
+        art["summary"] = summary or ""
         art["excerpt"] = _english_excerpt(art.get("snippet", ""))
 
     return articles

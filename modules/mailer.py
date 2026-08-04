@@ -18,6 +18,7 @@ def build_html(articles: list[dict]) -> str:
     for i, art in enumerate(articles, 1):
         title = art.get("title", "")
         summary = art.get("summary", "")
+        summary_html = f'<div style="font-size:14px;color:#444;margin-bottom:6px;line-height:1.6;">{summary}</div>' if summary else ""
         link = art.get("link", "")
         source = art.get("source", "")
         pub_date = art.get("pub_date", "")
@@ -36,9 +37,7 @@ def build_html(articles: list[dict]) -> str:
             <div style="font-size:12px;color:#888;margin-bottom:6px;line-height:1.5;">
                 {art.get("excerpt", "")}
             </div>
-            <div style="font-size:14px;color:#444;margin-bottom:6px;line-height:1.6;">
-                {summary}
-            </div>
+            {summary_html}
             <div style="font-size:12px;">
                 {link_tag}
             </div>
