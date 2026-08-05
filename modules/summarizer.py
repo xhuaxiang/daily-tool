@@ -25,6 +25,22 @@ _DEFAULT_MODELS = {
     "openai-compat": "gpt-4o-mini",
 }
 
+# AI 回复疑似"素材不足"拒答的匹配模式（命中则视为失败，不展示）
+_REFUSAL_RE = re.compile(
+    r"(缺少.{0,8}(?:原文|正文|内容|新闻)|"
+    r"没有提供.{0,8}(?:原文|正文|内容)|"
+    r"未提供.{0,8}(?:原文|正文|内容)|"
+    r"无法.{0,8}(?:为您|生成|总结|完成|提供)|"
+    r"只有标题|内容不足|信息不足|"
+    r"insufficient|cannot summarize|unable to summarize|no content provided)",
+    re.I | re.S,
+)
+
+
+def _is_refusal(text: str) -> bool:
+    """判断 AI 回复是否为'素材不足'类拒答"""
+    return bool(text and _REFUSAL_RE.search(text))
+
 
 def _api_key(item: dict) -> str:
     """获取 API key：item.api_key > item.api_key_env 环境变量 > provider 默认环境变量"""
@@ -91,8 +107,10 @@ def summarize_all(articles: list[dict], language: str = "zh", ai_cfg: list | dic
             continue
 
         prompt = (
-            f"请用{lang_label}为以下新闻写一段摘要（100-200字），"
-            f"涵盖核心事实、关键数据、各方观点或背景，让读者无需点击原文也能了解全貌：\n\n{text[:3000]}"
+            f"请用{lang_label}为以下新闻写一段摘要（100-200字）。"
+            f"注意：以下素材可能只是新闻标题或导语，内容有限，"
+            f"请据此给出最有用、最精炼的摘要；若只有标题，请基于标题合理概括，"
+            f"不要回复'缺少原文/无法生成'之类的说明。\n\n{text[:3000]}"
         )
 
         summary = None
@@ -105,9 +123,14 @@ def summarize_all(articles: list[dict], language: str = "zh", ai_cfg: list | dic
 
             model = item.get("model") or _DEFAULT_MODELS.get(provider, "gpt-4o-mini")
             base_url = item.get("base_url") or _BASE_URLS.get(provider, "https://api.openai.com")
-            summary = _call_ai(key, model, prompt, base_url)
-            if summary:
-                break
+            resp = _call_ai(key, model, prompt, base_url)
+            if not resp:
+                continue
+            if _is_refusal(resp):
+                logger.info("[%s] AI 回复疑似拒答，已忽略", provider)
+                continue
+            summary = resp
+            break
 
         art["summary"] = summary or ""
         art["excerpt"] = _english_excerpt(art.get("snippet", ""))
