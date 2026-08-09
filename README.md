@@ -72,13 +72,13 @@ python main.py
 | provider | 说明 | 环境变量 | 默认模型 |
 |----------|------|---------|---------|
 | `gemini` | Google Gemini | `GEMINI_API_KEY` | `gemini-2.0-flash-lite` |
-| `deepseek` | DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-chat` |
+| `deepseek` | DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-v4-flash` |
 | `openai-compat` | 兼容 OpenAI 接口 | 自定义 | `gpt-4o-mini` |
 
 **DeepSeek 示例：**
 ```json
 "ai": [
-    { "provider": "deepseek", "model": "deepseek-chat" },
+    { "provider": "deepseek", "model": "deepseek-v4-flash" },
     { "provider": "gemini", "model": "gemini-2.0-flash-lite" }
 ]
 ```

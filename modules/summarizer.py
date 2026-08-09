@@ -20,7 +20,7 @@ _BASE_URLS = {
 
 # provider → 默认模型
 _DEFAULT_MODELS = {
-    "deepseek": "deepseek-chat",
+    "deepseek": "deepseek-v4-flash",
     "gemini": "gemini-2.0-flash-lite",
     "openai-compat": "gpt-4o-mini",
 }
@@ -32,6 +32,7 @@ _REFUSAL_RE = re.compile(
     r"未提供.{0,8}(?:原文|正文|内容)|"
     r"无法.{0,8}(?:为您|生成|总结|完成|提供)|"
     r"只有标题|内容不足|信息不足|"
+    r"您似乎忘记|"
     r"insufficient|cannot summarize|unable to summarize|no content provided)",
     re.I | re.S,
 )
