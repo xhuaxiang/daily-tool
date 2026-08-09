@@ -93,8 +93,27 @@ def _english_excerpt(snippet: str) -> str:
     return result
 
 
+def _make_prompts(text: str, title: str, lang_label: str) -> list[str]:
+    """构造 [主 prompt, 兜底 prompt]。主 prompt 拒答时，用兜底强制基于标题生成。"""
+    main = (
+        f"请用{lang_label}为以下新闻写一段摘要（50-100字）。"
+        f"注意：以下素材可能只是新闻标题或导语，内容有限，"
+        f"请据此给出最有用、最精炼的摘要；若只有标题，请基于标题合理概括。"
+        f"规则：必须直接输出摘要正文，禁止出现'缺少内容/无法生成/请提供原文'等任何说明文字。"
+        f"\n\n{text[:3000]}"
+    )
+    fallback = (
+        f"请用{lang_label}写一段新闻摘要（50-100字）。"
+        f"以下是全部可用素材（可能只有标题）：\n\n"
+        f"标题：{title[:200]}\n{text[:500]}\n\n"
+        f"规则：必须直接输出摘要正文，禁止出现'缺少内容/无法生成/请提供原文'等任何说明文字；"
+        f"即使素材只有标题，也要基于标题合理概括出有信息量的摘要。"
+    )
+    return [main, fallback]
+
+
 def summarize_all(articles: list[dict], language: str = "zh", ai_cfg: list | dict | None = None) -> list[dict]:
-    """批量生成摘要：AI 优先，失败则摘要留空（不展示 fallback）"""
+    """批量生成摘要：AI 优先，拒答自动用兜底 prompt 重试，最终失败则摘要留空（不展示原文）"""
     if isinstance(ai_cfg, dict):
         ai_cfg = [ai_cfg]
     ai_cfg = ai_cfg or []
@@ -107,13 +126,6 @@ def summarize_all(articles: list[dict], language: str = "zh", ai_cfg: list | dic
             art["summary"] = ""
             continue
 
-        prompt = (
-            f"请用{lang_label}为以下新闻写一段摘要（100-200字）。"
-            f"注意：以下素材可能只是新闻标题或导语，内容有限，"
-            f"请据此给出最有用、最精炼的摘要；若只有标题，请基于标题合理概括，"
-            f"不要回复'缺少原文/无法生成'之类的说明。\n\n{text[:3000]}"
-        )
-
         summary = None
         for item in ai_cfg:
             provider = item.get("provider", "")
@@ -124,14 +136,18 @@ def summarize_all(articles: list[dict], language: str = "zh", ai_cfg: list | dic
 
             model = item.get("model") or _DEFAULT_MODELS.get(provider, "gpt-4o-mini")
             base_url = item.get("base_url") or _BASE_URLS.get(provider, "https://api.openai.com")
-            resp = _call_ai(key, model, prompt, base_url)
-            if not resp:
-                continue
-            if _is_refusal(resp):
-                logger.info("[%s] AI 回复疑似拒答，已忽略", provider)
-                continue
-            summary = resp
-            break
+            # 主 prompt 拒答时，用兜底 prompt（强制基于标题概括）重试一次
+            for attempt, prompt in enumerate(_make_prompts(text, art.get("title", ""), lang_label)):
+                resp = _call_ai(key, model, prompt, base_url)
+                if not resp:
+                    break
+                if _is_refusal(resp):
+                    logger.info("[%s] AI 回复疑似拒答，%s", provider, "改用兜底 prompt 重试" if attempt == 0 else "已忽略")
+                    continue
+                summary = resp
+                break
+            if summary:
+                break
 
         art["summary"] = summary or ""
         art["excerpt"] = _english_excerpt(art.get("snippet", ""))
