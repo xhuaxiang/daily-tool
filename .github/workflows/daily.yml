@@ -2,8 +2,8 @@ name: Daily News Brief
 
 on:
   schedule:
-    # UTC 22:05 = 北京时间 6:05
-    - cron: '5 22 * * *'
+    # UTC 22:17 = 北京时间 6:17（避开整点调度高峰，降低被延迟概率）
+    - cron: '17 22 * * *'
   workflow_dispatch:  # 支持手动触发
 
 jobs:
