@@ -13,6 +13,7 @@
 │   ├── config.py              # 配置加载
 │   ├── fetcher.py             # 网络抓取
 │   ├── parser.py              # RSS / HTML 解析
+│   ├── dedup.py               # 跨站点新闻去重
 │   ├── categorizer.py         # 文章分类 & 偏好排序
 │   ├── summarizer.py          # AI（Gemini/DeepSeek等）/ 本地摘要
 │   └── mailer.py              # SMTP 邮件发送
@@ -58,6 +59,18 @@ python main.py
 | `prefer_categories` | 偏好类别，匹配的文章优先展示 |
 | `max_articles` | 最大输出条数 |
 | `summary_language` | 摘要语言，`zh` 或 `en` |
+| `dedupe_threshold` | 可选，标题相似度阈值，默认 `0.9`，越小去重越激进 |
+
+### 新闻去重
+
+抓取后会跨站点去重，命中任一条件即视为重复：
+
+- 规范化 URL 相同（忽略 `utm_*` 等跟踪参数、末尾斜杠、`www.` 前缀）；
+- 规范化标题相同（忽略大小写、标点、HTML 实体、` - 来源` 后缀）；
+- 长标题高度相似（相似度 ≥ `dedupe_threshold`，且数字/月份/星期一致）；
+- 摘要高度相似（应对同一篇通稿被不同站点改标题转载）。
+
+重复时保留发布时间最新、内容更全的一条。
 
 ### 文章分类
 

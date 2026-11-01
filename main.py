@@ -14,6 +14,7 @@ from modules.parser import parse
 from modules.summarizer import summarize_all
 from modules.mailer import send_email
 from modules.categorizer import classify, sort_by_preference
+from modules.dedup import dedupe
 
 logging.basicConfig(
     level=logging.INFO,
@@ -96,14 +97,13 @@ def main():
         logger.warning("No articles fetched")
         return
 
-    # 去重
-    seen = set()
-    unique = []
-    for art in all_articles:
-        key = art.get("title", "")
-        if key and key not in seen:
-            seen.add(key)
-            unique.append(art)
+    # 去重：同一站点重复条目 + 不同站点转载的同一篇新闻
+    unique = dedupe(
+        all_articles,
+        threshold=config.get("dedupe_threshold", 0.9),
+        source_names=[s.get("name", "") for s in sources],
+        date_parser=_parse_datetime,
+    )
 
     logger.info("Total unique articles: %d", len(unique))
 
