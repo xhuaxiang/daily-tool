@@ -1,6 +1,10 @@
 name: Daily News Brief
 
 on:
+  # TODO(scheduling): GitHub 原生 schedule 在 2026-08 之后经常延迟 2-5 小时，
+  # 且延迟发生在 run 创建之前（任务本身只跑约 1 分钟），拆分 job 或并发化无法解决。
+  # 计划改用外部定时器（cron-job.org / Cloudflare Worker）准点调用 workflow_dispatch；
+  # 外部触发验证通过后删除下面的 schedule 块，避免一天发送两封邮件。
   schedule:
     # UTC 22:17 = 北京时间 6:17（避开整点调度高峰，降低被延迟概率）
     - cron: '17 22 * * *'

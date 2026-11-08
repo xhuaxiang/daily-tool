@@ -9,6 +9,26 @@ from bs4 import BeautifulSoup
 
 logger = logging.getLogger("news")
 
+_CONTENT_ENCODED = "{http://purl.org/rss/1.0/modules/content/}encoded"
+_ATOM_NS = "{http://www.w3.org/2005/Atom}"
+
+
+def _html_to_text(html_fragment: str) -> str:
+    """把 RSS/Atom 里的 HTML 片段转成纯文本"""
+    if not html_fragment:
+        return ""
+    text = BeautifulSoup(html_fragment, "lxml").get_text(separator=" ", strip=True)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _element_text(element) -> str:
+    """取元素内容：优先直接文本（CDATA），其次拼接子节点，兼容 Atom xhtml"""
+    if element is None:
+        return ""
+    if element.text and element.text.strip():
+        return element.text
+    return "".join(element.itertext())
+
 
 def _parse_rss(content: str, source_name: str, max_articles: int) -> list[dict]:
     articles = []
@@ -24,47 +44,52 @@ def _parse_rss(content: str, source_name: str, max_articles: int) -> list[dict]:
         title_el = item.find("title")
         link_el = item.find("link")
         desc_el = item.find("description")
+        content_el = item.find(_CONTENT_ENCODED)
         pub_el = item.find("pubDate")
         title = title_el.text.strip() if title_el is not None and title_el.text else ""
         link = link_el.text.strip() if link_el is not None and link_el.text else ""
-        description = desc_el.text.strip() if desc_el is not None and desc_el.text else ""
+        description = _element_text(desc_el)
+        # content:encoded 通常比 description 完整，优先使用
+        body_html = _element_text(content_el) or description
         pub_date = pub_el.text.strip() if pub_el is not None and pub_el.text else ""
         if not title:
             continue
-        plain_text = (
-            BeautifulSoup(description, "lxml").get_text(separator=" ", strip=True)
-            if description
-            else ""
-        )
-        plain_text = re.sub(r"\s+", " ", plain_text).strip()
+        plain_text = _html_to_text(body_html)
         articles.append({
             "title": unescape(title),
             "link": link,
-            "snippet": plain_text[:2000],
+            "snippet": plain_text[:4000],
             "pub_date": pub_date,
             "source": source_name,
         })
 
-    ns = "{http://www.w3.org/2005/Atom}"
+    ns = _ATOM_NS
     for entry in root.iter(f"{ns}entry"):
         if len(articles) >= max_articles:
             break
         title_el = entry.find(f"{ns}title")
-        link_el = entry.find(f"{ns}link")
         summary_el = entry.find(f"{ns}summary")
+        content_el = entry.find(f"{ns}content")
         updated_el = entry.find(f"{ns}updated")
         title = title_el.text.strip() if title_el is not None and title_el.text else ""
-        link = link_el.get("href", "") if link_el is not None else ""
-        summary_text = ""
-        if summary_el is not None and summary_el.text:
-            summary_text = BeautifulSoup(summary_el.text, "lxml").get_text(separator=" ")
+        # 优先取 rel=alternate 的链接，避免拿到 rel=self
+        link = ""
+        links = entry.findall(f"{ns}link")
+        for link_el in links:
+            if link_el.get("rel", "alternate") == "alternate" and link_el.get("href"):
+                link = link_el.get("href", "")
+                break
+        if not link and links:
+            link = links[0].get("href", "")
+        body_html = _element_text(content_el) or _element_text(summary_el)
+        summary_text = _html_to_text(body_html)
         pub_date = updated_el.text.strip() if updated_el is not None and updated_el.text else ""
         if not title:
             continue
         articles.append({
             "title": unescape(title),
             "link": link,
-            "snippet": summary_text[:2000] if summary_text else "",
+            "snippet": summary_text[:4000] if summary_text else "",
             "pub_date": pub_date,
             "source": source_name,
         })

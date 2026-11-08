@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from modules.config import load_config
 from modules.fetcher import fetch
 from modules.parser import parse
+from modules.fulltext import enrich_articles
 from modules.summarizer import summarize_all
 from modules.mailer import send_email
 from modules.categorizer import classify, sort_by_preference
@@ -137,7 +138,8 @@ def main():
 
     logger.info("Final articles: %d from %d sources", len(all_articles), len(source_groups))
 
-    # 摘要
+    # 抽取正文（失败回退 RSS 摘要），再生成结构化摘要
+    all_articles = enrich_articles(all_articles)
     all_articles = summarize_all(all_articles, language, ai_cfg)
 
     # 按用户偏好排序
@@ -156,14 +158,15 @@ def main():
         cat, _ = classify(art)
         tag = f"[{cat}]" if cat != "其他" else ""
         title = art.get('title', '').replace('\xa0', ' ').strip()
+        title_zh = (art.get('title_zh') or '').replace('\xa0', ' ').strip()
         date_str = art.get('pub_date', '')
-        print(f"\n#{i} {tag} [{art.get('source','')}] {date_str} {title}")
-        if art.get("excerpt"):
-            excerpt = art['excerpt'].replace('\xa0', ' ').strip()
-            print(f"   EN: {excerpt}")
-        if art.get("summary"):
-            summary = art['summary'].replace('\xa0', ' ').strip()
-            print(f"   >> {summary}")
+        print(f"\n#{i} {tag} [{art.get('source','')}] {date_str} {title_zh or title}")
+        if title_zh and title_zh != title:
+            print(f"   原文: {title}")
+        for point in art.get("summary_points") or []:
+            print(f"   - {point}")
+        if not art.get("summary_points") and art.get("summary"):
+            print(f"   >> {art['summary'].replace(chr(10), ' ')}")
         if art.get("link"):
             print(f"   -> {art['link']}")
     print()
