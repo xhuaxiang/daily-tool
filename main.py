@@ -4,16 +4,18 @@
 入口文件，直接 python main.py 运行
 """
 
+import argparse
 import email.utils
 import logging
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from modules.config import load_config
 from modules.fetcher import fetch
 from modules.parser import parse
 from modules.fulltext import enrich_articles
 from modules.summarizer import summarize_all
-from modules.mailer import send_email
+from modules.mailer import build_html, send_email
 from modules.categorizer import classify, sort_by_preference
 from modules.dedup import dedupe
 
@@ -72,12 +74,21 @@ def _is_today(pub_date: str, max_age_hours: int = 24) -> bool:
 
 
 def main():
+    parser = argparse.ArgumentParser(description="每日新闻早报")
+    parser.add_argument(
+        "--preview", nargs="?", const="preview.html", metavar="FILE",
+        help="只生成 HTML 预览，不发邮件（默认 preview.html）",
+    )
+    parser.add_argument("--no-ai", action="store_true", help="跳过 AI，使用本地摘要")
+    parser.add_argument("--limit", type=int, default=0, help="只处理前 N 篇，便于本地测试")
+    args = parser.parse_args()
+
     config = load_config()
     sources = config.get("news_sources", [])
     max_articles = config.get("max_articles", 15)
     language = config.get("summary_language", "zh")
     email_cfg = config.get("email", {})
-    ai_cfg = config.get("ai", {})
+    ai_cfg = [] if args.no_ai else config.get("ai", {})
     prefer_categories = config.get("prefer_categories", [])
 
     if not sources:
@@ -138,6 +149,10 @@ def main():
 
     logger.info("Final articles: %d from %d sources", len(all_articles), len(source_groups))
 
+    if args.limit > 0:
+        all_articles = all_articles[:args.limit]
+        logger.info("Limited to %d articles for local test", len(all_articles))
+
     # 抽取正文（失败回退 RSS 摘要），再生成结构化摘要
     all_articles = enrich_articles(all_articles)
     all_articles = summarize_all(all_articles, language, ai_cfg)
@@ -171,6 +186,12 @@ def main():
             print(f"   -> {art['link']}")
     print()
     print("=" * 50)
+
+    if args.preview:
+        preview_path = Path(args.preview).expanduser()
+        preview_path.write_text(build_html(all_articles), encoding="utf-8")
+        logger.info("Preview written to %s", preview_path.resolve())
+        return
 
     # 发送邮件
     send_email(email_cfg, all_articles)

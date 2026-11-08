@@ -1,4 +1,4 @@
-"""摘要模块 - AI / 本地摘要生成，所有 provider 统一走 OpenAI 兼容 API。
+"""摘要模块 - DeepSeek 摘要生成（OpenAI 兼容 API）。
 
 输出结构化结果，供邮件自包含展示：
 - title_zh：中文标题
@@ -16,22 +16,11 @@ import requests
 
 logger = logging.getLogger("news")
 
-# provider → 默认环境变量
-_DEFAULT_ENV = {"deepseek": "DEEPSEEK_API_KEY", "gemini": "GEMINI_API_KEY"}
-
-# provider → base_url（均为 OpenAI 兼容端点）
-_BASE_URLS = {
-    "deepseek": "https://api.deepseek.com",
-    "gemini": "https://generativelanguage.googleapis.com/v1beta/openai",
-    "openai-compat": "https://api.openai.com",
-}
-
-# provider → 默认模型
-_DEFAULT_MODELS = {
-    "deepseek": "deepseek-v4-flash",
-    "gemini": "gemini-2.0-flash-lite",
-    "openai-compat": "gpt-4o-mini",
-}
+# 仅支持 DeepSeek
+_PROVIDER = "deepseek"
+_DEFAULT_API_KEY_ENV = "DEEPSEEK_API_KEY"
+_DEFAULT_BASE_URL = "https://api.deepseek.com"
+_DEFAULT_MODEL = "deepseek-v4-flash"
 
 # AI 回复疑似"素材不足"拒答的匹配模式（命中则视为失败，不展示）
 _REFUSAL_RE = re.compile(
@@ -52,11 +41,10 @@ def _is_refusal(text: str) -> bool:
 
 
 def _api_key(item: dict) -> str:
-    """获取 API key：item.api_key > item.api_key_env 环境变量 > provider 默认环境变量"""
+    """获取 API key：item.api_key > item.api_key_env 环境变量 > DEEPSEEK_API_KEY"""
     if key := item.get("api_key", ""):
         return key
-    provider = item.get("provider", "")
-    env_name = item.get("api_key_env", "") or _DEFAULT_ENV.get(provider, "")
+    env_name = item.get("api_key_env", "") or _DEFAULT_API_KEY_ENV
     return os.environ.get(env_name, "")
 
 
@@ -194,14 +182,18 @@ def _summarize_one(art: dict, ai_cfg: list[dict], lang_label: str) -> dict | Non
         return None
 
     for item in ai_cfg:
-        provider = item.get("provider", "")
+        provider = (item.get("provider") or _PROVIDER).strip().lower()
+        if provider != _PROVIDER:
+            logger.warning("Unsupported AI provider '%s', only deepseek is supported; skip", provider)
+            continue
+
         key = _api_key(item)
         if not key:
             logger.debug("[%s] API key not set, skip", provider)
             continue
 
-        model = item.get("model") or _DEFAULT_MODELS.get(provider, "gpt-4o-mini")
-        base_url = item.get("base_url") or _BASE_URLS.get(provider, "https://api.openai.com")
+        model = item.get("model") or _DEFAULT_MODEL
+        base_url = item.get("base_url") or _DEFAULT_BASE_URL
         # 主 prompt 拒答时，用兜底 prompt（强制基于标题概括）重试一次
         for attempt, prompt in enumerate(_make_prompts(text, title, lang_label)):
             resp = _call_ai(key, model, prompt, base_url)

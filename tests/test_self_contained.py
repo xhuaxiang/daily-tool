@@ -91,6 +91,21 @@ class SummarizerTest(unittest.TestCase):
         self.assertTrue(result[0]["summary_points"])
         self.assertIn("第一句", result[0]["summary_points"][0])
 
+    def test_non_deepseek_provider_is_rejected(self):
+        articles = [{"title": "Original", "snippet": "article body"}]
+        with patch("modules.summarizer._call_ai") as call:
+            result = summarize_all(articles, "zh", [{"provider": "gemini", "api_key": "k"}])
+        call.assert_not_called()
+        self.assertEqual(result[0]["summary_status"], "local")
+
+    def test_missing_provider_defaults_to_deepseek(self):
+        ai_json = '{"title_zh": "中文标题", "points": ["要点"]}'
+        articles = [{"title": "Original", "snippet": "article body"}]
+        with patch("modules.summarizer._call_ai", return_value=ai_json) as call:
+            result = summarize_all(articles, "zh", [{"api_key": "k"}])
+        call.assert_called_once()
+        self.assertEqual(result[0]["summary_status"], "ok")
+
 
 class MailerTest(unittest.TestCase):
     def test_build_html_escapes_and_renders_points(self):
@@ -121,6 +136,63 @@ class MailerTest(unittest.TestCase):
             "summary_status": "ok",
         }]
         self.assertEqual(build_html(articles).count("同一标题"), 1)
+
+    def test_build_html_shows_body_text(self):
+        body = "第一段正文内容。" * 50 + "正文末尾标记"
+        articles = [{
+            "title": "T",
+            "title_zh": "T",
+            "summary_points": ["AI 要点"],
+            "summary_status": "ok",
+            "full_text": body,
+            "text_source": "page",
+            "link": "https://example.com/a",
+        }]
+        html = build_html(articles)
+        self.assertIn("正文末尾标记", html)
+        self.assertIn("AI 要点", html)
+        self.assertIn("<details", html)
+        self.assertIn("展开正文", html)
+
+    def test_long_body_is_truncated(self):
+        articles = [{
+            "title": "T",
+            "title_zh": "T",
+            "summary_points": ["要点"],
+            "summary_status": "ok",
+            "full_text": "长" * 3500,
+            "text_source": "page",
+        }]
+        html = build_html(articles)
+        self.assertIn("正文较长，已截断", html)
+        self.assertNotIn("长" * 3001, html)
+
+    def test_local_fallback_still_shows_body(self):
+        body = "本地兜底正文标记"
+        articles = [{
+            "title": "T",
+            "title_zh": "T",
+            "summary_points": [body],
+            "summary_status": "local",
+            "full_text": body,
+            "text_source": "feed",
+        }]
+        html = build_html(articles)
+        self.assertIn("AI 摘要不可用", html)
+        self.assertEqual(html.count(body), 1)
+
+    def test_short_feed_summary_is_inline(self):
+        articles = [{
+            "title": "T",
+            "title_zh": "T",
+            "summary_points": ["要点"],
+            "summary_status": "ok",
+            "full_text": "RSS 摘要内容",
+            "text_source": "feed",
+        }]
+        html = build_html(articles)
+        self.assertIn("RSS 摘要", html)
+        self.assertNotIn("<details", html)
 
 
 if __name__ == "__main__":

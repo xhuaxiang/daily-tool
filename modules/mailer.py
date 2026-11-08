@@ -38,17 +38,67 @@ def _summary_html(art: dict) -> str:
     return f'<div style="font-size:14px;color:#333;margin-bottom:8px;line-height:1.6;">{_esc(summary)}</div>'
 
 
-def _excerpt_html(art: dict) -> str:
+_BODY_MAX = 3000        # 每篇正文最多展示 3000 字符，避免邮件过长被客户端截断
+_BODY_PARA_MAX = 500    # 单段目标长度，feed 长文本按句子切段
+
+
+def _body_paragraphs(text: str) -> list[str]:
+    """拆成可读段落：页面正文按换行拆；feed 常为单行长文本，再按句子切分。"""
+    paragraphs = [p.strip() for p in re.split(r"\n+", text) if p.strip()]
+    if len(paragraphs) > 1:
+        return paragraphs
+
+    # 中文句号后通常没有空格，英文句号后通常有空格
+    sentences = re.split(r"(?<=[。！？!?])|(?<=[.!?])\s+", paragraphs[0])
+    chunks, current = [], ""
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+        if current and len(current) + len(sentence) > _BODY_PARA_MAX:
+            chunks.append(current)
+            current = sentence
+        else:
+            current = f"{current} {sentence}".strip()
+    if current:
+        chunks.append(current)
+    return chunks or paragraphs
+
+
+def _body_html(art: dict) -> str:
+    """渲染正文；正文缺失时回退到 RSS 摘要。"""
     text = (art.get("full_text") or art.get("snippet") or "").strip()
     if not text:
         return ""
-    text = re.sub(r"\s+", " ", text).strip()
-    if len(text) > 220:
-        text = text[:217].rstrip() + "..."
-    label = "正文摘录" if art.get("text_source") == "page" else "RSS 摘要"
+    truncated = len(text) > _BODY_MAX
+    if truncated:
+        text = text[:_BODY_MAX].rstrip()
+
+    is_page = art.get("text_source") == "page"
+    label = "展开正文" if is_page else "展开 RSS 正文"
+    count_text = "已截取前 3000 字" if truncated else f"约 {len(text)} 字"
+    body = "".join(
+        f'<p style="margin:0 0 8px;">{_esc(p)}</p>' for p in _body_paragraphs(text)
+    )
+    note = (
+        '<div style="font-size:11px;color:#999;margin-top:4px;">'
+        '正文较长，已截断，完整内容请点原文</div>'
+        if truncated else ""
+    )
+    # RSS 摘要通常很短，直接展示；正文用可折叠块，避免每封邮件过长
+    if is_page or len(text) > 800:
+        return (
+            '<details style="margin-top:10px;padding-top:10px;'
+            'border-top:1px solid #e5e5e5;">'
+            f'<summary style="cursor:pointer;color:#1a73e8;font-size:13px;">'
+            f'{label}（{count_text}）</summary>'
+            '<div style="font-size:13px;color:#333;line-height:1.7;margin-top:8px;">'
+            f'{body}{note}</div></details>'
+        )
     return (
-        '<div style="font-size:12px;color:#777;line-height:1.6;margin-top:8px;">'
-        f'<span style="color:#999;">{label}：</span>{_esc(text)}</div>'
+        '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #eee;">'
+        '<div style="font-size:12px;color:#999;margin-bottom:4px;">RSS 摘要</div>'
+        f'<div style="font-size:13px;color:#333;line-height:1.7;">{body}</div></div>'
     )
 
 
@@ -74,9 +124,9 @@ def build_html(articles: list[dict]) -> str:
                 'AI 摘要不可用，以下为原文摘录</div>'
             )
 
-        summary_html = _summary_html(art)
-        # 本地兜底时 points 已是原文摘录，避免重复展示
-        excerpt_html = "" if art.get("summary_status") == "local" else _excerpt_html(art)
+        # 本地兜底时 points 只是正文前 160 字，直接展示正文更完整
+        summary_html = "" if art.get("summary_status") == "local" else _summary_html(art)
+        body_html = _body_html(art)
 
         link = _safe_url(art.get("link", ""))
         link_tag = (
@@ -96,7 +146,7 @@ def build_html(articles: list[dict]) -> str:
             {original_html}
             {status_html}
             {summary_html}
-            {excerpt_html}
+            {body_html}
             <div style="font-size:12px;margin-top:6px;">
                 {link_tag}
             </div>
