@@ -25,3 +25,4 @@ venv/
 
 # 本地配置文件（避免覆盖 GitHub 上的版本）
 config.json
+.claude
