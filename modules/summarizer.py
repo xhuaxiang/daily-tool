@@ -20,7 +20,8 @@ logger = logging.getLogger("news")
 _PROVIDER = "deepseek"
 _DEFAULT_API_KEY_ENV = "DEEPSEEK_API_KEY"
 _DEFAULT_BASE_URL = "https://api.deepseek.com"
-_DEFAULT_MODEL = "deepseek-v4-flash"
+# deepseek-chat 直接输出 JSON；带推理的 v4-flash 容易把 token 耗在 reasoning 上导致 JSON 截断
+_DEFAULT_MODEL = "deepseek-chat"
 
 # AI 回复疑似"素材不足"拒答的匹配模式（命中则视为失败，不展示）
 _REFUSAL_RE = re.compile(
@@ -56,7 +57,7 @@ def _call_ai(api_key: str, model: str, prompt: str, base_url: str) -> str | None
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.1,
-        "max_tokens": 600,
+        "max_tokens": 1200,
     }
     try:
         resp = requests.post(url, headers=headers, json=payload, timeout=30)
@@ -96,7 +97,7 @@ def _make_prompts(text: str, title: str, lang_label: str) -> list[str]:
         f"你是新闻编辑。请阅读以下新闻素材，用{lang_label}输出严格 JSON（不要 markdown 代码块，不要任何额外文字）：\n"
         f"{schema}\n\n"
         f"要求：\n"
-        f"1. title_zh：把标题翻译或改写成简洁的中文标题；原标题已是中文时保留原意；\n"
+        f"1. title_zh：忠实翻译原标题，保留主语、数字、动作和语气；标题过长时只做最小精简，不得根据正文改写标题；\n"
         f"2. points：输出 3 条要点，每条不超过 60 字，必须包含素材中的关键数字、主体和动作；\n"
         f"3. excerpt_zh：一句话核心结论，不超过 50 字；\n"
         f"4. 只使用素材中明确出现的信息，禁止推测、补充背景或编造；\n"
@@ -108,7 +109,7 @@ def _make_prompts(text: str, title: str, lang_label: str) -> list[str]:
         f"请仅根据下面的标题和素材，用{lang_label}输出严格 JSON（不要代码块、不要额外文字）：\n"
         f"{schema}\n\n"
         f"要求：\n"
-        f"1. title_zh 按标题字面翻译或转述；\n"
+        f"1. title_zh 按标题字面忠实翻译，不得改写成摘要；\n"
         f"2. points 只复述素材中明确写出的信息；素材不足时宁可少写，不要编造；\n"
         f"3. 禁止出现'无法生成/请提供原文/内容不足'等说明文字。\n\n"
         f"标题：{title[:300]}\n素材：\n{text[:800]}"
@@ -150,7 +151,7 @@ def _parse_ai_json(text: str) -> dict | None:
         return None
     return {
         "title_zh": title,
-        "points": cleaned[:5],
+        "points": cleaned[:3],
         "excerpt_zh": str(data.get("excerpt_zh") or "").strip(),
     }
 
@@ -211,6 +212,10 @@ def _summarize_one(art: dict, ai_cfg: list[dict], lang_label: str) -> dict | Non
                 continue
             # 模型没按 JSON 输出，但内容可用：作为单条要点
             cleaned = resp.strip()
+            # 截断的 JSON 不能当要点展示，交给兜底 prompt 重试
+            if cleaned.startswith("{") or '"title_zh"' in cleaned or '"points"' in cleaned:
+                logger.warning("[%s] AI returned incomplete JSON, retry with fallback prompt", provider)
+                continue
             if len(cleaned) >= 10:
                 return {"title_zh": "", "points": [cleaned], "excerpt_zh": ""}
             break
@@ -231,12 +236,14 @@ def summarize_all(articles: list[dict], language: str = "zh", ai_cfg: list | dic
             art["title_zh"] = parsed["title_zh"] or art.get("title", "")
             art["summary_points"] = parsed["points"]
             art["summary"] = "\n".join(parsed["points"])
+            art["excerpt_zh"] = parsed.get("excerpt_zh", "")
             art["summary_status"] = "ok"
         else:
             art["title_zh"] = art.get("title", "")
             fallback = _local_summary(art)
             art["summary_points"] = [fallback] if fallback else []
             art["summary"] = fallback
+            art["excerpt_zh"] = ""
             art["summary_status"] = "local"
         art["excerpt"] = _english_excerpt(art.get("snippet", ""))
 

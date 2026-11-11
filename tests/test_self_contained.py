@@ -81,6 +81,7 @@ class SummarizerTest(unittest.TestCase):
             result = summarize_all(articles, "zh", [{"provider": "deepseek", "api_key": "k"}])
         self.assertEqual(result[0]["title_zh"], "中文标题")
         self.assertEqual(result[0]["summary_points"], ["要点一", "要点二"])
+        self.assertEqual(result[0]["excerpt_zh"], "结论")
         self.assertEqual(result[0]["summary_status"], "ok")
 
     def test_summarize_all_falls_back_to_local_text(self):
@@ -90,6 +91,13 @@ class SummarizerTest(unittest.TestCase):
         self.assertEqual(result[0]["summary_status"], "local")
         self.assertTrue(result[0]["summary_points"])
         self.assertIn("第一句", result[0]["summary_points"][0])
+
+    def test_truncated_json_is_not_used_as_point(self):
+        articles = [{"title": "Original", "snippet": "第一句。第二句。"}]
+        with patch("modules.summarizer._call_ai", return_value='{"title_zh": "标题", "points": ["'):
+            result = summarize_all(articles, "zh", [{"provider": "deepseek", "api_key": "k"}])
+        self.assertEqual(result[0]["summary_status"], "local")
+        self.assertNotIn("title_zh", " ".join(result[0]["summary_points"]))
 
     def test_non_deepseek_provider_is_rejected(self):
         articles = [{"title": "Original", "snippet": "article body"}]
@@ -151,7 +159,7 @@ class MailerTest(unittest.TestCase):
         html = build_html(articles)
         self.assertIn("正文末尾标记", html)
         self.assertIn("AI 要点", html)
-        self.assertIn("<details", html)
+        self.assertIn("<details open", html)
         self.assertIn("展开正文", html)
 
     def test_long_body_is_truncated(self):
@@ -193,6 +201,22 @@ class MailerTest(unittest.TestCase):
         html = build_html(articles)
         self.assertIn("RSS 摘要", html)
         self.assertNotIn("<details", html)
+
+    def test_build_html_shows_excerpt_and_original_title(self):
+        articles = [{
+            "title": "Original title",
+            "title_zh": "中文标题",
+            "excerpt_zh": "一句话结论",
+            "summary_points": ["要点"],
+            "summary_status": "ok",
+            "full_text": "正文内容标记",
+            "text_source": "page",
+        }]
+        html = build_html(articles)
+        self.assertIn("摘要：", html)
+        self.assertIn("一句话结论", html)
+        self.assertIn("原标题：", html)
+        self.assertIn("Original title", html)
 
 
 if __name__ == "__main__":

@@ -24,6 +24,17 @@ def _safe_url(value) -> str:
     return url if url.lower().startswith(("http://", "https://")) else ""
 
 
+def _excerpt_zh_html(art: dict) -> str:
+    """AI 一句话核心结论"""
+    text = (art.get("excerpt_zh") or "").strip()
+    if not text:
+        return ""
+    return (
+        '<div style="font-size:13px;color:#555;margin:4px 0 8px;line-height:1.6;">'
+        f'<span style="color:#999;">摘要：</span>{_esc(text)}</div>'
+    )
+
+
 def _summary_html(art: dict) -> str:
     points = art.get("summary_points") or []
     if points:
@@ -88,7 +99,7 @@ def _body_html(art: dict) -> str:
     # RSS 摘要通常很短，直接展示；正文用可折叠块，避免每封邮件过长
     if is_page or len(text) > 800:
         return (
-            '<details style="margin-top:10px;padding-top:10px;'
+            '<details open style="margin-top:10px;padding-top:10px;'
             'border-top:1px solid #e5e5e5;">'
             f'<summary style="cursor:pointer;color:#1a73e8;font-size:13px;">'
             f'{label}（{count_text}）</summary>'
@@ -111,7 +122,10 @@ def build_html(articles: list[dict]) -> str:
         display_title = title_zh or title
         original_html = ""
         if title_zh and title_zh != title:
-            original_html = f'<div style="font-size:12px;color:#999;margin-top:4px;">{_esc(title)}</div>'
+            original_html = (
+                '<div style="font-size:12px;color:#999;margin-top:4px;">'
+                f'<span style="color:#bbb;">原标题：</span>{_esc(title)}</div>'
+            )
 
         source = art.get("source", "")
         pub_date = art.get("pub_date", "")
@@ -126,6 +140,7 @@ def build_html(articles: list[dict]) -> str:
 
         # 本地兜底时 points 只是正文前 160 字，直接展示正文更完整
         summary_html = "" if art.get("summary_status") == "local" else _summary_html(art)
+        excerpt_html = _excerpt_zh_html(art)
         body_html = _body_html(art)
 
         link = _safe_url(art.get("link", ""))
@@ -145,6 +160,7 @@ def build_html(articles: list[dict]) -> str:
             </div>
             {original_html}
             {status_html}
+            {excerpt_html}
             {summary_html}
             {body_html}
             <div style="font-size:12px;margin-top:6px;">
