@@ -29,3 +29,7 @@ config.json
 
 # 本地预览文件
 preview*.html
+
+# P0 诊断报告与人工标注（本地）
+reports/
+data/

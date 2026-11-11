@@ -164,9 +164,21 @@ def dedupe(
     threshold: float = _FUZZY_THRESHOLD,
     source_names: list[str] | None = None,
     date_parser=None,
+    stats: dict | None = None,
 ) -> list[dict]:
-    """返回去重后的文章列表，重复时保留信息更新的一条"""
+    """返回去重后的文章列表，重复时保留信息更新的一条。
+
+    stats 传入时原地写入诊断信息：
+    - input: 输入条数
+    - kept: 保留条数
+    - duplicates_removed: 去掉的重复条数
+    - by_source: 被去掉的重复条目按来源计数
+    """
     names = {_normalize_text(n) for n in (source_names or []) if n}
+    if stats is not None:
+        stats["input"] = len(articles)
+        stats["duplicates_removed"] = 0
+        stats["by_source"] = {}
     kept: list[dict] = []
     kept_titles: list[str] = []
     kept_grams: list[set[str]] = []
@@ -197,6 +209,10 @@ def dedupe(
             continue
 
         # 重复：保留信息更新（时间更新/内容更全）的那一条
+        if stats is not None:
+            stats["duplicates_removed"] += 1
+            source = art.get("source", "unknown")
+            stats["by_source"][source] = stats["by_source"].get(source, 0) + 1
         if _rank(art, date_parser) > _rank(kept[dup_idx], date_parser):
             old_url = kept_urls[dup_idx]
             if old_url and url_index.get(old_url) == dup_idx:
@@ -209,6 +225,8 @@ def dedupe(
                 url_index.setdefault(url_key, dup_idx)
 
     removed = len(articles) - len(kept)
+    if stats is not None:
+        stats["kept"] = len(kept)
     if removed:
         logger.info("Deduped %d duplicate articles (%d -> %d)", removed, len(articles), len(kept))
     return kept
