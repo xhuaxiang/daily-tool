@@ -236,11 +236,12 @@ def run(
     timeout: int,
     fulltext: bool,
     output_dir: Path,
+    sources_override: list[dict] | None = None,
 ) -> tuple[list[dict], dict, dict]:
     config = load_config()
-    sources = config.get("news_sources", [])
+    sources = sources_override if sources_override is not None else config.get("news_sources", [])
     if not sources:
-        raise SystemExit("config.json 里没有 news_sources")
+        raise SystemExit("没有可诊断的 news_sources")
 
     runs: list[dict] = []
     all_articles: list[dict] = []
@@ -328,7 +329,17 @@ def main() -> None:
     parser.add_argument("--timeout", type=int, default=10, help="正文请求超时秒数（默认 10）")
     parser.add_argument("--no-fulltext", action="store_true", help="跳过正文探测，只统计抓取/解析/重复")
     parser.add_argument("--output-dir", default="reports", help="报告输出目录（默认 reports）")
+    parser.add_argument(
+        "--sources-json",
+        help="用 JSON 源列表覆盖 config.json（用于候选源测试）",
+    )
     args = parser.parse_args()
+
+    sources_override = None
+    if args.sources_json:
+        sources_override = json.loads(Path(args.sources_json).read_text(encoding="utf-8"))
+        if not isinstance(sources_override, list):
+            raise SystemExit("--sources-json 必须是源对象数组")
 
     logging.basicConfig(
         level=logging.INFO,
@@ -343,6 +354,7 @@ def main() -> None:
         timeout=args.timeout,
         fulltext=not args.no_fulltext,
         output_dir=Path(args.output_dir),
+        sources_override=sources_override,
     )
 
     print()

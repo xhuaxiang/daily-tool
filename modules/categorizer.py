@@ -42,6 +42,13 @@ _CATEGORIES: dict[str, dict[str, list[str]]] = {
             "世界经济", "全球经济",
             "基建", "基础设施",
             "经济展望", "经济前景",
+            "economy", "economic", "inflation", "deflation", "recession",
+            "central bank", "rate cut", "rate hike", "interest rates",
+            "monetary policy", "fiscal policy", "trade war", "trade deal",
+            "jobs report", "labor market", "consumer prices", "retail sales",
+            "manufacturing", "industrial production", "economic growth",
+            "supply chain", "export controls", "oil", "crude oil", "opec",
+            "energy prices", "energy market",
         ],
         "aux": [
             "增长", "放缓", "下行", "上行", "企稳",
@@ -76,6 +83,10 @@ _CATEGORIES: dict[str, dict[str, list[str]]] = {
             "监管", "证监会", "银保监",
             "数字货币", "稳定币",
             "并购", "收购", "重组",
+            "stock market", "stocks", "investors", "wall street",
+            "bond yields", "treasury yields", "earnings", "quarterly results",
+            "market rally", "selloff", "nasdaq", "s&p 500", "dow jones",
+            "dollar", "oil prices", "gold prices", "bitcoin", "cryptocurrency",
         ],
         "aux": [
             "上涨", "下跌", "反弹", "回调",
@@ -109,6 +120,10 @@ _CATEGORIES: dict[str, dict[str, list[str]]] = {
             "互联网", "云计算", "大数据",
             "生物科技", "基因编辑",
             "航天", "火箭", "卫星", "SpaceX",
+            "artificial intelligence", "chip", "chips", "semiconductor",
+            "semiconductors", "nvidia", "software", "cloud", "robotics",
+            "electric vehicle", "battery", "apple", "google", "microsoft",
+            "meta", "amazon", "tesla",
         ],
         "aux": [
             "创新", "专利", "开源",
@@ -138,6 +153,10 @@ _CATEGORIES: dict[str, dict[str, list[str]]] = {
             "印度", "伊朗", "以色列",
             "G7", "G20", "金砖", "上合组织",
             "地缘", "冲突", "战争",
+            "china", "chinese", "russia", "ukraine", "european union",
+            "middle east", "israel", "iran", "gaza", "nato",
+            "united nations", "geopolitics", "foreign policy", "diplomacy",
+            "summit", "sanctions", "taiwan", "south china sea",
         ],
         "aux": [
             "边境", "领土",
@@ -166,6 +185,12 @@ _CATEGORIES: dict[str, dict[str, list[str]]] = {
             "总理", "部长", "省长",
             "公共安全", "社会治安",
             "医疗改革", "教育改革", "养老金",
+            "president", "white house", "congress", "senate",
+            "house of representatives", "election", "campaign",
+            "democrats", "republicans", "trump", "biden",
+            "supreme court", "legislation", "regulation",
+            "government shutdown", "impeachment", "lawmakers",
+            "governor", "administration", "hearing",
         ],
         "aux": [
             "公告", "通知", "文件",
@@ -192,6 +217,9 @@ _CATEGORIES: dict[str, dict[str, list[str]]] = {
             "疫情", "传染病",
             "失踪", "救援",
             "曝光", "调查",
+            "storm", "earthquake", "wildfire", "flood", "hurricane",
+            "shooting", "protest", "strike", "accident", "outbreak",
+            "emergency", "rescue",
         ],
         "aux": [
             "报道", "消息", "快讯",
@@ -218,14 +246,25 @@ _CATEGORY_WEIGHTS = {
 }
 
 
+def _keyword_hit(text: str, keyword: str) -> bool:
+    """关键词命中判断。
+
+    中文关键词继续用子串匹配；纯 ASCII 关键词加词边界，避免 "AI" 命中
+    "said/chair"、"App" 命中 "apparently" 这类误判。text 需已 lower。
+    """
+    kw = keyword.lower()
+    if not kw:
+        return False
+    if all(ord(ch) < 128 for ch in kw):
+        pattern = r"(?<![a-z0-9])" + re.escape(kw) + r"(?![a-z0-9])"
+        return re.search(pattern, text) is not None
+    return kw in text
+
+
 def _match_keywords(text: str, keywords: list[str]) -> int:
     """计算某组关键词在文本中的命中次数（不区分大小写）"""
     lower_text = text.lower()
-    hits = 0
-    for kw in keywords:
-        if kw.lower() in lower_text:
-            hits += 1
-    return hits
+    return sum(1 for kw in keywords if _keyword_hit(lower_text, kw))
 
 
 def classify(article: dict) -> tuple[str, int]:
@@ -253,23 +292,23 @@ def classify(article: dict) -> tuple[str, int]:
 
         # 核心词计分（标题命中 +3 额外加成）
         for kw in tiers.get("core", []):
-            if kw.lower() in full_text:
+            if _keyword_hit(full_text, kw):
                 score += 5
-                if kw.lower() in title_lower:
+                if _keyword_hit(title_lower, kw):
                     score += 3  # 标题加成
 
         # 扩展词计分
         for kw in tiers.get("expand", []):
-            if kw.lower() in full_text:
+            if _keyword_hit(full_text, kw):
                 score += 3
-                if kw.lower() in title_lower:
+                if _keyword_hit(title_lower, kw):
                     score += 2
 
         # 辅助词计分
         for kw in tiers.get("aux", []):
-            if kw.lower() in full_text:
+            if _keyword_hit(full_text, kw):
                 score += 1
-                if kw.lower() in title_lower:
+                if _keyword_hit(title_lower, kw):
                     score += 1
 
         # 应用类别权重
@@ -286,22 +325,16 @@ def classify(article: dict) -> tuple[str, int]:
             priority_bonus += 3
 
     # ── 选出最高分类别 ──
-    if category_scores:
+    if category_scores and max(category_scores.values()) >= 2:
         best_cat = max(category_scores, key=category_scores.get)
         best_score = category_scores[best_cat] + priority_bonus
     else:
+        # 没有类别达到最低可信分时，不拿"优先级加分"硬套到第一个类别
         best_cat = "其他"
         best_score = priority_bonus
 
     # 归一化：除以5让数字不过大
     final_score = int(best_score / 5)
-
-    # 如果所有类别得分都极低（总分 < 2），归为"其他"
-    if final_score < 2 and best_cat != "其他":
-        # 再检查是否真的什么关键词都没命中
-        total_raw = sum(category_scores.values())
-        if total_raw < 5:
-            best_cat = "其他"
 
     return best_cat, final_score
 
@@ -317,19 +350,19 @@ def get_all_category_scores(article: dict) -> dict[str, float]:
     for cat, tiers in _CATEGORIES.items():
         score = 0.0
         for kw in tiers.get("core", []):
-            if kw.lower() in full_text:
+            if _keyword_hit(full_text, kw):
                 score += 5
-                if kw.lower() in title_lower:
+                if _keyword_hit(title_lower, kw):
                     score += 3
         for kw in tiers.get("expand", []):
-            if kw.lower() in full_text:
+            if _keyword_hit(full_text, kw):
                 score += 3
-                if kw.lower() in title_lower:
+                if _keyword_hit(title_lower, kw):
                     score += 2
         for kw in tiers.get("aux", []):
-            if kw.lower() in full_text:
+            if _keyword_hit(full_text, kw):
                 score += 1
-                if kw.lower() in title_lower:
+                if _keyword_hit(title_lower, kw):
                     score += 1
         scores[cat] = score * _CATEGORY_WEIGHTS.get(cat, 1.0)
     return scores

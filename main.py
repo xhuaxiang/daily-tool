@@ -7,6 +7,7 @@
 import argparse
 import email.utils
 import logging
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -25,6 +26,11 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger("news")
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
 
 
 def _parse_datetime(pub_date: str) -> datetime | None:
@@ -81,6 +87,8 @@ def main():
     )
     parser.add_argument("--no-ai", action="store_true", help="跳过 AI，使用本地摘要")
     parser.add_argument("--limit", type=int, default=0, help="只处理前 N 篇，便于本地测试")
+    parser.add_argument("--no-selection", action="store_true", help="关闭 P1 规则选稿，回到按时间选取")
+    parser.add_argument("--explain-selection", action="store_true", help="输出每篇文章的选稿评分和原因")
     args = parser.parse_args()
 
     config = load_config()
@@ -103,6 +111,9 @@ def main():
             continue
         # 每个源多抓一些，方便按时间筛选最新的
         articles = parse(src, raw, 30)
+        publisher = src.get("publisher") or src.get("name", "unknown")
+        for article in articles:
+            article["publisher"] = publisher
         all_articles.extend(articles)
 
     if not all_articles:
@@ -135,8 +146,11 @@ def main():
         src = art.get("source", "unknown")
         source_groups.setdefault(src, []).append(art)
 
-    # 每源最多保留最新文章数
-    fresh_per_source = 5
+    selection_cfg = config.get("selection", {})
+    selection_enabled = selection_cfg.get("enabled", True) and not args.no_selection
+
+    # 每源最多保留最新文章数：选稿模式多留一些候选，交给 P1 排序
+    fresh_per_source = 8 if selection_enabled else 5
     fresh_articles = []
     for src, arts in source_groups.items():
         arts_sorted = sorted(arts, key=lambda a: _parse_datetime(a.get("pub_date", "")) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
@@ -144,21 +158,48 @@ def main():
 
     logger.info("Fresh articles (latest %d per source): %d", fresh_per_source, len(fresh_articles))
 
-    # 取最新文章，按发布时间倒序排列
-    all_articles = sorted(fresh_articles, key=lambda a: _parse_datetime(a.get("pub_date", "")) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)[:max_articles]
+    if selection_enabled:
+        # P1：先粗排 30 篇候选，只抓这些文章的正文，再精排到 max_articles
+        from modules.selection import final_select, preselect
+
+        candidates = preselect(fresh_articles, config)
+        candidates = enrich_articles(candidates)
+        selection_total = args.limit if args.limit > 0 else max_articles
+        all_articles = final_select(candidates, config, selection_total)
+    else:
+        # 旧逻辑：按发布时间取最新 N 篇
+        all_articles = sorted(fresh_articles, key=lambda a: _parse_datetime(a.get("pub_date", "")) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)[:max_articles]
+
+        if args.limit > 0:
+            all_articles = all_articles[:args.limit]
+            logger.info("Limited to %d articles for local test", len(all_articles))
+
+        # 抽取正文（失败回退 RSS 摘要），再生成结构化摘要
+        all_articles = enrich_articles(all_articles)
 
     logger.info("Final articles: %d from %d sources", len(all_articles), len(source_groups))
 
-    if args.limit > 0:
-        all_articles = all_articles[:args.limit]
-        logger.info("Limited to %d articles for local test", len(all_articles))
-
-    # 抽取正文（失败回退 RSS 摘要），再生成结构化摘要
-    all_articles = enrich_articles(all_articles)
     all_articles = summarize_all(all_articles, language, ai_cfg)
 
-    # 按用户偏好排序
-    all_articles = sort_by_preference(all_articles, prefer_categories)
+    # 规则选稿已经按综合分排序；旧逻辑保留偏好排序
+    if not selection_enabled:
+        all_articles = sort_by_preference(all_articles, prefer_categories)
+
+    if args.explain_selection:
+        print()
+        print("=" * 50)
+        print("[选稿明细]")
+        for i, art in enumerate(all_articles, 1):
+            sel = art.get("_selection") or {}
+            print(
+                f"#{i} score={sel.get('score', '-')} "
+                f"[{sel.get('category', '?')}] [{art.get('source', '')}] "
+                f"event={sel.get('event_id', '-')} coverage={sel.get('coverage', '-')}"
+            )
+            print(f"   {art.get('title', '')}")
+            if sel.get("reasons"):
+                print(f"   理由: {'; '.join(sel['reasons'])}")
+        print("=" * 50)
 
     # 统一 pub_date 为东八区 YYYY-MM-DD hh:mm:ss
     for art in all_articles:
