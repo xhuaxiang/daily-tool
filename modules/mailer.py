@@ -99,7 +99,7 @@ def _body_html(art: dict) -> str:
     # RSS 摘要通常很短，直接展示；正文用可折叠块，避免每封邮件过长
     if is_page or len(text) > 800:
         return (
-            '<details open style="margin-top:10px;padding-top:10px;'
+            '<details style="margin-top:10px;padding-top:10px;'
             'border-top:1px solid #e5e5e5;">'
             f'<summary style="cursor:pointer;color:#1a73e8;font-size:13px;">'
             f'{label}（{count_text}）</summary>'
