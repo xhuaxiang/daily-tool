@@ -5,9 +5,12 @@ import os
 import re
 import smtplib
 from datetime import datetime, timedelta, timezone
+from email import encoders
+from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from html import escape
+from pathlib import Path
 
 logger = logging.getLogger("news")
 
@@ -113,8 +116,32 @@ def _body_html(art: dict) -> str:
     )
 
 
-def build_html(articles: list[dict]) -> str:
+def _run_summary_html(summary: dict | None) -> str:
+    if not summary:
+        return ""
+    parts = []
+    if summary.get("candidates") is not None:
+        parts.append(f"候选 {summary['candidates']}")
+    if summary.get("selected") is not None:
+        parts.append(f"入选 {summary['selected']}")
+    if summary.get("fulltext_coverage") is not None:
+        parts.append(f"正文覆盖 {summary['fulltext_coverage']:.0%}")
+    if summary.get("sources") is not None:
+        parts.append(f"{summary['sources']} 个来源")
+    if summary.get("duplicates_removed") is not None:
+        parts.append(f"去重 {summary['duplicates_removed']}")
+    if not parts:
+        return ""
+    return (
+        '<div style="margin:10px auto 0;color:#888;font-size:12px;">'
+        + " · ".join(parts)
+        + "</div>"
+    )
+
+
+def build_html(articles: list[dict], run_summary: dict | None = None) -> str:
     now_str = datetime.now(_BEIJING_TZ).strftime("%Y-%m-%d %H:%M")
+    run_summary_html = _run_summary_html(run_summary)
     items_html = ""
     for i, art in enumerate(articles, 1):
         title = art.get("title", "")
@@ -176,6 +203,7 @@ def build_html(articles: list[dict]) -> str:
     <div style="text-align:center;padding:20px 0;border-bottom:2px solid #e0e0e0;margin-bottom:20px;">
         <h1 style="margin:0;font-size:24px;color:#333;">每日新闻早报</h1>
         <p style="margin:6px 0 0;color:#999;font-size:13px;">{now_str} (UTC+8) &nbsp;·&nbsp; 共 {len(articles)} 条新闻</p>
+        {run_summary_html}
     </div>
     {items_html}
     <div style="text-align:center;padding:16px 0;border-top:1px solid #e0e0e0;margin-top:20px;color:#aaa;font-size:12px;">
@@ -185,7 +213,12 @@ def build_html(articles: list[dict]) -> str:
 </html>"""
 
 
-def send_email(email_cfg: dict, articles: list[dict]) -> bool:
+def send_email(
+    email_cfg: dict,
+    articles: list[dict],
+    attachments: list[Path] | None = None,
+    run_summary: dict | None = None,
+) -> bool:
     smtp_server = email_cfg.get("smtp_server", "smtp.qq.com")
     smtp_port = email_cfg.get("smtp_port", 587)
     sender = email_cfg.get("sender_email", "")
@@ -204,12 +237,27 @@ def send_email(email_cfg: dict, articles: list[dict]) -> bool:
         return False
 
     now_str = datetime.now(_BEIJING_TZ).strftime("%Y-%m-%d")
-    html = build_html(articles)
-    msg = MIMEMultipart("alternative")
+    html = build_html(articles, run_summary)
+    msg = MIMEMultipart("mixed")
     msg["Subject"] = f"每日新闻早报 {now_str} ({len(articles)} 条)"
     msg["From"] = sender
     msg["To"] = ", ".join(receivers)
-    msg.attach(MIMEText(html, "html", "utf-8"))
+    body = MIMEMultipart("alternative")
+    body.attach(MIMEText(html, "html", "utf-8"))
+    msg.attach(body)
+
+    for path in attachments or []:
+        path = Path(path)
+        try:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(path.read_bytes())
+            encoders.encode_base64(part)
+            part.add_header(
+                "Content-Disposition", "attachment", filename=path.name,
+            )
+            msg.attach(part)
+        except OSError as exc:
+            logger.warning("Failed to attach %s: %s", path, exc)
 
     try:
         with smtplib.SMTP(smtp_server, smtp_port) as server:

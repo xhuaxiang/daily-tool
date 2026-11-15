@@ -159,7 +159,8 @@ class MailerTest(unittest.TestCase):
         html = build_html(articles)
         self.assertIn("正文末尾标记", html)
         self.assertIn("AI 要点", html)
-        self.assertIn("<details open", html)
+        self.assertIn("<details", html)
+        self.assertNotIn("<details open", html)
         self.assertIn("展开正文", html)
 
     def test_long_body_is_truncated(self):

@@ -113,13 +113,29 @@ def final_select(articles: list[dict], config: dict, total: int) -> list[dict]:
 
     events = [_synthetic_event(group) for group in groups.values()]
     ranked = []
+    scored_articles: list[tuple[dict, str, dict]] = []
     for event in events:
         ordered = _ordered_articles(event, config, now)
         if not ordered:
             continue
         best_article, best_score = ordered[0]
         ranked.append((event, best_article, best_score, ordered))
+        for article, info in ordered:
+            scored_articles.append((article, event["event_id"], info))
     ranked.sort(key=lambda item: item[2]["score"], reverse=True)
+
+    # 先给所有候选写入完整评分，方便运行快照记录落选原因
+    for article, event_id, info in scored_articles:
+        article["_selection"] = {
+            "event_id": event_id,
+            "score": info["score"],
+            "signals": info.get("signals", {}),
+            "coverage": (info.get("signals") or {}).get("importance", 0) * 4,
+            "category": info["category"],
+            "reasons": list(info.get("reasons", [])),
+            "selected": False,
+            "reject_reason": "",
+        }
 
     selected: list[dict] = []
     selected_ids: set[int] = set()
@@ -152,13 +168,17 @@ def final_select(articles: list[dict], config: dict, total: int) -> list[dict]:
         publisher_counts[_publisher(article)] += 1
         event_counts[event_id] += 1
         category_counts[info["category"]] += 1
-        article["_selection"] = {
+        selection = article.setdefault("_selection", {})
+        selection.update({
             "event_id": event_id,
             "score": info["score"],
+            "signals": info.get("signals", {}),
             "coverage": (info.get("signals") or {}).get("importance", 0) * 4,
             "category": info["category"],
-            "reasons": info["reasons"],
-        }
+            "reasons": list(info.get("reasons", [])),
+            "selected": True,
+            "reject_reason": "",
+        })
 
     # 1. 类别保底：尽量让经济/时政/国际各有最低条数
     for category, target in category_min.items():
@@ -228,6 +248,23 @@ def final_select(articles: list[dict], config: dict, total: int) -> list[dict]:
 
     if len(selected) < total:
         logger.warning("Selected only %d/%d articles", len(selected), total)
+
+    # 记录落选原因，供运行快照和离线评估使用
+    for article, event_id, _ in scored_articles:
+        selection = article.get("_selection") or {}
+        if selection.get("selected"):
+            continue
+        if len(selected) >= total:
+            reason = "总数已满"
+        elif event_counts[event_id] >= per_event_max:
+            reason = "事件配额已满"
+        elif source_counts[article.get("source", "")] >= per_source_max:
+            reason = "来源配额已满"
+        elif publisher_counts[_publisher(article)] >= per_publisher_max:
+            reason = "媒体配额已满"
+        else:
+            reason = "综合分未入选"
+        selection["reject_reason"] = reason
 
     selected.sort(key=lambda art: art.get("_selection", {}).get("score", 0), reverse=True)
     logger.info(

@@ -8,6 +8,7 @@ import argparse
 import email.utils
 import logging
 import sys
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -19,6 +20,13 @@ from modules.summarizer import summarize_all
 from modules.mailer import build_html, send_email
 from modules.categorizer import classify, sort_by_preference
 from modules.dedup import dedupe
+from modules.snapshot import (
+    RUN_DIR,
+    build_archive,
+    build_snapshot,
+    write_json,
+    write_labels_csv,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -104,28 +112,35 @@ def main():
         return
 
     all_articles = []
+    source_stats = []
 
     for src in sources:
         raw = fetch(src.get("url"), src.get("name", "unknown"), src.get("timeout", 15), src.get("type", "rss"))
-        if not raw:
-            continue
         # 每个源多抓一些，方便按时间筛选最新的
-        articles = parse(src, raw, 30)
+        articles = parse(src, raw, 30) if raw else []
         publisher = src.get("publisher") or src.get("name", "unknown")
         for article in articles:
             article["publisher"] = publisher
         all_articles.extend(articles)
+        source_stats.append({
+            "name": src.get("name", "unknown"),
+            "publisher": publisher,
+            "fetch_ok": bool(raw),
+            "parsed": len(articles),
+        })
 
     if not all_articles:
         logger.warning("No articles fetched")
         return
 
     # 去重：同一站点重复条目 + 不同站点转载的同一篇新闻
+    dedupe_stats: dict = {}
     unique = dedupe(
         all_articles,
         threshold=config.get("dedupe_threshold", 0.9),
         source_names=[s.get("name", "") for s in sources],
         date_parser=_parse_datetime,
+        stats=dedupe_stats,
     )
 
     logger.info("Total unique articles: %d", len(unique))
@@ -139,6 +154,8 @@ def main():
     if not today_articles:
         logger.warning("No articles from today, falling back to all unique articles")
         today_articles = unique
+
+    fresh_by_source = Counter(art.get("source", "") for art in today_articles)
 
     # 按源分组，每个源只取最新的 N 篇
     source_groups = {}
@@ -176,6 +193,16 @@ def main():
 
         # 抽取正文（失败回退 RSS 摘要），再生成结构化摘要
         all_articles = enrich_articles(all_articles)
+        for article in all_articles:
+            article["_selection"] = {
+                "category": classify(article)[0],
+                "selected": True,
+                "reject_reason": "",
+                "reasons": [],
+                "score": None,
+            }
+        candidates = all_articles
+        selection_total = len(all_articles)
 
     logger.info("Final articles: %d from %d sources", len(all_articles), len(source_groups))
 
@@ -184,6 +211,57 @@ def main():
     # 规则选稿已经按综合分排序；旧逻辑保留偏好排序
     if not selection_enabled:
         all_articles = sort_by_preference(all_articles, prefer_categories)
+
+    # P0：快照覆盖 24h 内全部去重文章；未进入候选池的也记录，便于评估漏选
+    snapshot_candidates = list(today_articles)
+    for article in snapshot_candidates:
+        if article.get("_selection"):
+            continue
+        article["_selection"] = {
+            "event_id": article.get("_event_id", ""),
+            "score": None,
+            "signals": {},
+            "category": classify(article)[0],
+            "reasons": [],
+            "selected": False,
+            "reject_reason": "未进入候选池",
+        }
+
+    run_date = datetime.now(_BEIJING_TZ).strftime("%Y-%m-%d")
+    run_dir = RUN_DIR / run_date
+    snapshot_payload = build_snapshot(
+        snapshot_candidates,
+        run_date=run_date,
+        source_stats=source_stats,
+        dedupe_stats=dedupe_stats,
+        fresh_by_source=fresh_by_source,
+        parsed_total=dedupe_stats.get("input", 0),
+        unique_total=dedupe_stats.get("kept", len(unique)),
+        fresh_total=len(today_articles),
+        selection_total=selection_total,
+    )
+    snapshot_path = write_json(run_dir / f"run-{run_date}.json", snapshot_payload)
+    archive_path = write_json(
+        run_dir / f"articles-{run_date}.json",
+        build_archive(today_articles, run_date=run_date),
+    )
+    labels_path = write_labels_csv(
+        snapshot_payload["candidates"],
+        run_dir / f"labels-{run_date}.csv",
+    )
+    totals = snapshot_payload["totals"]
+    run_summary = {
+        "candidates": totals["candidates"],
+        "selected": totals["selected"],
+        "fulltext_coverage": totals["fulltext_coverage"],
+        "sources": totals["sources"],
+        "duplicates_removed": totals["duplicates_removed"],
+    }
+    logger.info(
+        "Run snapshot: %s (candidates=%d, selected=%d, fulltext=%d%%)",
+        snapshot_path, totals["candidates"], totals["selected"],
+        round(totals["fulltext_coverage"] * 100),
+    )
 
     if args.explain_selection:
         print()
@@ -230,12 +308,19 @@ def main():
 
     if args.preview:
         preview_path = Path(args.preview).expanduser()
-        preview_path.write_text(build_html(all_articles), encoding="utf-8")
+        preview_path.write_text(
+            build_html(all_articles, run_summary), encoding="utf-8"
+        )
         logger.info("Preview written to %s", preview_path.resolve())
         return
 
-    # 发送邮件
-    send_email(email_cfg, all_articles)
+    # 发送邮件：正文 + 运行快照 + 全文归档 + 空标注表
+    send_email(
+        email_cfg,
+        all_articles,
+        attachments=[snapshot_path, archive_path, labels_path],
+        run_summary=run_summary,
+    )
 
 
 if __name__ == "__main__":
