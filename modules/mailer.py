@@ -9,6 +9,7 @@ from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import format_datetime
 from html import escape
 from pathlib import Path
 
@@ -236,10 +237,13 @@ def send_email(
         logger.warning("No valid receiver email, skipping send")
         return False
 
-    now_str = datetime.now(_BEIJING_TZ).strftime("%Y-%m-%d")
+    now = datetime.now(_BEIJING_TZ)
+    now_str = now.strftime("%Y-%m-%d")
     html = build_html(articles, run_summary)
     msg = MIMEMultipart("mixed")
     msg["Subject"] = f"每日新闻早报 {now_str} ({len(articles)} 条)"
+    # 显式写 Date：部分 SMTP 中继不会补，收信端排序和 R1 回填都依赖它
+    msg["Date"] = format_datetime(now)
     msg["From"] = sender
     msg["To"] = ", ".join(receivers)
     body = MIMEMultipart("alternative")

@@ -130,8 +130,9 @@ def main():
         })
 
     if not all_articles:
-        logger.warning("No articles fetched")
-        return
+        # 退出码非 0，让 Actions 变红；否则"没抓到文章"会显示成绿色成功
+        logger.error("No articles fetched")
+        raise SystemExit(1)
 
     # 去重：同一站点重复条目 + 不同站点转载的同一篇新闻
     dedupe_stats: dict = {}
@@ -315,12 +316,16 @@ def main():
         return
 
     # 发送邮件：正文 + 运行快照 + 全文归档 + 空标注表
-    send_email(
+    sent = send_email(
         email_cfg,
         all_articles,
         attachments=[snapshot_path, archive_path, labels_path],
         run_summary=run_summary,
     )
+    if not sent:
+        # 发信失败必须让任务失败；否则 Actions 显示成功但你没收到邮件
+        logger.error("Email was not sent")
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
