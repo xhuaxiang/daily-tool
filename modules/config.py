@@ -78,6 +78,19 @@ DEFAULT_CONFIG = {
             "Federal Reserve": 0.90,
         },
     },
+    # R0：本地 RAG 索引。密钥只从 EMBEDDING_API_KEY 读取。
+    "rag": {
+        "db_path": "data/rag/index.db",
+        "chunk_size": 800,
+        "chunk_overlap": 100,
+        "embedding": {
+            "provider": "openai-compatible",
+            "base_url": "https://api.siliconflow.cn/v1",
+            "model": "BAAI/bge-m3",
+            "batch_size": 32,
+            "timeout": 30,
+        },
+    },
 }
 
 
