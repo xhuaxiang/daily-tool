@@ -26,6 +26,9 @@ DEFAULT_CONFIG = {
     "email": {
         "smtp_server": "smtp.qq.com",
         "smtp_port": 587,
+        "imap_server": "imap.qq.com",
+        "imap_port": 993,
+        "imap_user": "",
         "sender_email": "",
         "receiver_email": ""
     },
