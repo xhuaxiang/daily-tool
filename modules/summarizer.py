@@ -176,6 +176,26 @@ def _local_summary(art: dict) -> str:
     return out[:160] + ("..." if len(out) > 160 else "")
 
 
+def complete(prompt: str, ai_cfg: list[dict] | dict | None) -> str | None:
+    """单轮补全，供 RAG 问答复用；按配置顺序尝试，跳过不支持的 provider。"""
+    items = ai_cfg if isinstance(ai_cfg, list) else [ai_cfg] if ai_cfg else []
+    for item in items:
+        if (item.get("provider") or _PROVIDER).strip().lower() != _PROVIDER:
+            continue
+        key = _api_key(item)
+        if not key:
+            continue
+        resp = _call_ai(
+            key,
+            item.get("model") or _DEFAULT_MODEL,
+            prompt,
+            item.get("base_url") or _DEFAULT_BASE_URL,
+        )
+        if resp:
+            return resp
+    return None
+
+
 def _summarize_one(art: dict, ai_cfg: list[dict], lang_label: str) -> dict | None:
     title = (art.get("title") or "").strip()
     text = (art.get("full_text") or art.get("snippet") or title).strip()
