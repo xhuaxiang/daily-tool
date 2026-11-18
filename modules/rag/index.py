@@ -32,8 +32,20 @@ def find_archive_files(inputs: list[str | Path]) -> list[Path]:
     return list(dict.fromkeys(paths))
 
 
+def _merge_article(old: dict, new: dict) -> dict:
+    """同一篇多次归档时合并：新值优先，但不用空值覆盖已有内容。
+
+    典型场景：后一天的快照里 title_zh 为空，直接覆盖会把中文标题弄丢。
+    """
+    merged = dict(old)
+    for key, value in new.items():
+        if value not in (None, "", [], {}):
+            merged[key] = value
+    return merged
+
+
 def load_articles(paths: list[Path]) -> list[dict]:
-    """读取全文归档；同一 id 只保留最后一次出现的版本。"""
+    """读取全文归档；同一 id 多次出现时合并字段。"""
     by_id: dict[str, dict] = {}
     for path in paths:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -49,7 +61,10 @@ def load_articles(paths: list[Path]) -> list[dict]:
                 or article.get("title")
                 or str(len(by_id))
             )
-            by_id[str(key)] = article
+            key = str(key)
+            by_id[key] = (
+                _merge_article(by_id[key], article) if key in by_id else article
+            )
     return list(by_id.values())
 
 

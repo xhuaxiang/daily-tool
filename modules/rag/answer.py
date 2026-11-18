@@ -16,11 +16,12 @@ MAX_CHUNK_CHARS = 1200
 PROMPT_TEMPLATE = """你是新闻检索助手。只依据下面给出的资料回答，不要使用资料以外的知识。
 
 规则：
-1. 用中文回答，控制在 3-6 句。
+1. 用中文回答，控制在 3-6 句；资料里的标题也算依据。
 2. 每个论断后面标出引用编号，如 [1]。
 3. 只输出 JSON，不要输出解释或代码块，格式：
    {{"answer": "...", "citations": [{{"chunk_id": "...", "quote": "原文片段"}}]}}
-4. quote 必须是资料里连续的一段原文，不能改写、不能拼接。
+4. quote 必须是资料里连续的一段原文，不能改写、不能拼接；资料可能是英文，
+   回答用中文，但 quote 照抄原文（英文就引英文）。
 5. 资料不足以回答时，answer 写“资料中没有相关信息”，citations 为空数组。
 
 资料：
@@ -92,7 +93,14 @@ def validate_citations(citations, chunks: list[dict]) -> tuple[list[dict], list[
         if not chunk or not quote:
             invalid.append({"chunk_id": chunk_id, "quote": quote, "reason": "缺少块或引用"})
             continue
-        if _normalize(quote) not in _normalize(chunk.get("text") or ""):
+        # 正文多为英文，中文标题也在 prompt 里，所以标题也算可引用原文
+        sources = [
+            chunk.get("text") or "",
+            chunk.get("title_zh") or "",
+            chunk.get("title") or "",
+        ]
+        normalized = _normalize(quote)
+        if not any(normalized in _normalize(source) for source in sources):
             invalid.append({"chunk_id": chunk_id, "quote": quote, "reason": "quote 不在原文中"})
             continue
         valid.append({

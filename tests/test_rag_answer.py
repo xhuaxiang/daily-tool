@@ -88,6 +88,15 @@ class CitationTest(unittest.TestCase):
         self.assertEqual(valid[0]["index"], 1)
         self.assertEqual(len(invalid), 3)
 
+    def test_quote_from_chinese_title_is_valid(self):
+        """正文是英文时，模型常引用中文标题；标题也是资料的一部分。"""
+        valid, invalid = validate_citations(
+            [{"chunk_id": "a1#0", "quote": "美联储维持利率不变"}],
+            CHUNKS,
+        )
+        self.assertEqual(len(valid), 1)
+        self.assertEqual(invalid, [])
+
     def test_quote_whitespace_is_normalized(self):
         valid, invalid = validate_citations(
             [{"chunk_id": "a1#0", "quote": "美联储周三宣布\n维持基准利率不变"}],

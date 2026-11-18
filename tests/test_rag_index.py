@@ -120,6 +120,18 @@ class ArchiveLoadingTest(unittest.TestCase):
         by_id = {article["id"]: article for article in articles}
         self.assertEqual(by_id["a1"]["title"], "新标题")
 
+    def test_empty_field_does_not_clobber_previous(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_archive(root, "2026-11-15", [_article("a1", "旧标题")])
+            later = _article("a1", "旧标题")
+            later["title_zh"] = ""
+            _write_archive(root, "2026-11-16", [later])
+
+            articles = load_articles(find_archive_files([root]))
+
+        self.assertEqual(articles[0]["title_zh"], "旧标题")
+
     def test_missing_input_raises(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(FileNotFoundError):

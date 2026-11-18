@@ -1,0 +1,20 @@
+{"id": "ev01", "question": "美国电动车厂商是否指望民主党上台后恢复联邦补贴？", "expect": "rivian-lucid-scout", "note": "电动车补贴"}
+{"id": "ev02", "question": "美国公立大学教授每周要工作多少小时？", "expect": "professors-faculty-workload", "note": "高校 workload"}
+{"id": "ev03", "question": "五角大楼1.5万亿美元的预算申请为什么推进不下去？", "expect": "pentagon-military-budget", "note": "国防预算"}
+{"id": "ev04", "question": "美国商务部针对中国租用英伟达算力采取了什么措施？", "expect": "nvidia-commerce-china-lutnick", "note": "算力漏洞"}
+{"id": "ev05", "question": "FAA全国停飞之后航班恢复得怎么样？", "expect": "flight-delays-ground-faa-stop", "note": "航班延误"}
+{"id": "ev06", "question": "比特币这个周末最低跌到多少美元？", "expect": "bitcoin-slides-to-62000", "note": "比特币"}
+{"id": "ev07", "question": "特朗普怎么回应FAA全国停飞这件事？", "expect": "trump-breaks-silence-on-faa", "note": "政治回应"}
+{"id": "ev08", "question": "今年假日消费里Z世代和千禧一代占多大比重？", "expect": "gen-z-millennials-half-holiday-spending", "note": "消费"}
+{"id": "ev09", "question": "沃顿和埃森哲的研究认为企业用AI时犯了什么错？", "expect": "ai-ferrari-profit-loss-wharton-accenture", "note": "AI 选型"}
+{"id": "ev10", "question": "麦肯锡说的4万亿美元贸易风险具体指什么？", "expect": "global-trade-4-trillion", "note": "供应链"}
+{"id": "ev11", "question": "哪个州给胰岛素设了价格上限？", "expect": "insulin-copay-price-caps", "note": "药价"}
+{"id": "ev12", "question": "欧洲央行对德国小型银行的监管提出了什么观点？", "expect": "ecb.in261116", "note": "银行监管"}
+{"id": "ev13", "question": "黄仁勋什么时候去国会作证？", "expect": "nvidia-jensen-huang-house-committee", "note": "国会听证"}
+{"id": "ev14", "question": "Anthropic的IPO定价可能高于多少？", "expect": "anthropic-ipo-price", "note": "IPO"}
+{"id": "ev15", "question": "史蒂夫·艾斯曼认为哪类股票会因英伟达事件受损最重？", "expect": "big-short-investor-steve-eisman", "note": "市场观点"}
+{"id": "ev16", "question": "美联储理事丽莎·库克会出席白宫那个委员会的听证会吗？", "expect": "lisa-cook-trump-fed-committee-hearing", "note": "美联储人事"}
+{"id": "ev17", "question": "德意志银行股价暴跌和什么泄露文件有关？", "expect": "deutsche-bank-leak-epstein-trump", "note": "银行丑闻"}
+{"id": "ev18", "question": "美联储主席认为人工智能会怎样影响经济和利率？", "expect": "kevin-warsh-fed-ai-jobs-productivity", "note": "AI 与货币政策"}
+{"id": "ev19", "question": "家得宝的新任首席执行官是谁？", "expect": "home-depot-hd-q3-earnings-2026", "note": "公司人事"}
+{"id": "ev20", "question": "谷歌在AI竞赛中面临什么样的两难？", "expect": "can-google-win-the-ai-race", "note": "科技竞争"}

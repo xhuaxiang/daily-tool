@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""R1 单轮问答：从归档检索 + 引用校验后回答。
+"""R2 单轮问答：混合检索（向量 + 关键词 + rerank）+ 引用校验后回答。
 
 示例：
     python tools/ask.py "上周美联储做了什么"
     python tools/ask.py "英伟达财报" --top-k 8
-    python tools/ask.py "英伟达财报" --no-llm     # 只看检索结果，不需要 LLM key
+    python tools/ask.py "英伟达财报" --no-rerank      # 只做向量+关键词融合
+    python tools/ask.py "艾斯曼" --mode keyword      # 不调 embedding
+    python tools/ask.py "英伟达财报" --no-llm        # 只看检索结果，不需要 LLM key
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from modules.config import load_config
 from modules.rag.answer import answer_question
 from modules.rag.embedding import EmbeddingError, embed_texts, embedding_settings, model_key
 from modules.rag.index import build_index, find_archive_files, load_articles
+from modules.rag.retrieval import MODES, Retriever
 from modules.rag.store import IndexStore
 
 
@@ -90,6 +93,16 @@ def main() -> None:
     )
     parser.add_argument("--db", default="", help="索引库路径，默认 config.rag.db_path")
     parser.add_argument("--top-k", type=int, default=5, help="检索块数，默认 5")
+    parser.add_argument(
+        "--mode", choices=MODES, default="hybrid",
+        help="vector=纯向量，keyword=纯关键词，hybrid=RRF 混合（默认）",
+    )
+    parser.add_argument(
+        "--no-rerank", action="store_true", help="关闭 rerank（默认开启）",
+    )
+    parser.add_argument(
+        "--candidates", type=int, default=20, help="rerank 前每路召回条数，默认 20",
+    )
     parser.add_argument("--no-llm", action="store_true", help="只检索，不调用模型")
     parser.add_argument("--rebuild", action="store_true", help="重建索引")
     args = parser.parse_args()
@@ -117,7 +130,10 @@ def main() -> None:
         stats = build_index(
             articles, db_path=db_path, config=config, rebuild=args.rebuild,
         )
-        vectors = embed_texts([args.question], config=config)
+        vector = (
+            None if args.mode == "keyword"
+            else embed_texts([args.question], config=config)[0]
+        )
     except EmbeddingError as exc:
         raise SystemExit(f"检索失败：{exc}")
 
@@ -130,7 +146,13 @@ def main() -> None:
                 "请先 --rebuild"
             )
         try:
-            chunks = store.search(vectors[0], top_k=args.top_k, model=index_model)
+            chunks = Retriever(store, config=config).search(
+                args.question, vector,
+                top_k=args.top_k,
+                mode=args.mode,
+                candidates=args.candidates,
+                rerank=not args.no_rerank,
+            )
         except ValueError as exc:
             raise SystemExit(f"检索失败：{exc}")
 

@@ -190,6 +190,33 @@ class IndexStore:
             })
         return results
 
+    def all_chunks(self, model: str | None = None) -> list[dict]:
+        """所有块的元数据 + 文本（不含向量），给关键词检索用。"""
+        selected_model = model or self.latest_model()
+        if not selected_model:
+            return []
+        rows = self.conn.execute(
+            "SELECT * FROM chunks WHERE model = ? ORDER BY rowid", (selected_model,)
+        ).fetchall()
+        results = []
+        for row in rows:
+            results.append({
+                "chunk_id": row["chunk_id"],
+                "article_id": row["article_id"],
+                "chunk_index": row["chunk_index"],
+                "chunk_count": row["chunk_count"],
+                "title": row["title"],
+                "title_zh": row["title_zh"],
+                "link": row["link"],
+                "source": row["source"],
+                "publisher": row["publisher"],
+                "published": row["published"],
+                "category": row["category"],
+                "event_id": row["event_id"],
+                "text": row["text"],
+            })
+        return results
+
     def close(self) -> None:
         self.conn.close()
 
