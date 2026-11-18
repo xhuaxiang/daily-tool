@@ -49,8 +49,8 @@ def _print_answer(result: dict, chunks: list[dict]) -> None:
         print("\n[回答]")
         print(result["answer"])
         print("\n[引用]")
-        for index, cite in enumerate(result["citations"], 1):
-            print(f" [{index}] {cite['title']}  {cite['published'][:10]}")
+        for cite in result["citations"]:
+            print(f" [{cite.get('index', '?')}] {cite['title']}  {cite['published'][:10]}")
             print(f"      {cite['quote'][:160]}")
             print(f"      {cite['link']}")
         if result["invalid"]:

@@ -81,6 +81,7 @@ def _normalize(value: str) -> str:
 def validate_citations(citations, chunks: list[dict]) -> tuple[list[dict], list[dict]]:
     """保留 chunk_id 存在且 quote 为原文子串的引用，其余记入 invalid。"""
     by_id = {chunk["chunk_id"]: chunk for chunk in chunks}
+    position = {chunk["chunk_id"]: index for index, chunk in enumerate(chunks, 1)}
     valid, invalid = [], []
     for item in citations if isinstance(citations, list) else []:
         if not isinstance(item, dict):
@@ -96,6 +97,8 @@ def validate_citations(citations, chunks: list[dict]) -> tuple[list[dict], list[
             continue
         valid.append({
             "chunk_id": chunk_id,
+            # 和回答里的 [n] 对齐：n 是检索结果里的序号，不是引用列表序号
+            "index": position[chunk_id],
             "quote": quote,
             "title": chunk.get("title_zh") or chunk.get("title") or "",
             "link": chunk.get("link") or "",

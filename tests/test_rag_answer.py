@@ -84,6 +84,8 @@ class CitationTest(unittest.TestCase):
         )
         self.assertEqual(len(valid), 1)
         self.assertEqual(valid[0]["title"], "美联储维持利率不变")
+        # index 与回答里的 [n] 对齐
+        self.assertEqual(valid[0]["index"], 1)
         self.assertEqual(len(invalid), 3)
 
     def test_quote_whitespace_is_normalized(self):
